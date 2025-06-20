@@ -1,4 +1,3 @@
-from xml.etree.ElementInclude import include
 from google import genai
 from openai import OpenAI
 import configparser
@@ -416,19 +415,25 @@ class FreeUntangler(BaseUntangler):
         self.__setup()
 
     def __setup(self):
+        config = configparser.ConfigParser()
+        config.read(".config")
+        hf_token=config["API_KEYS"]["HF_TOKEN"]
+
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
-            device_map="cuda",
+            #device_map="cuda",
             torch_dtype="auto",
             trust_remote_code=True,
+            token=hf_token
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, token=hf_token)
+        print(f"Max Token: {self.tokenizer.model_max_length}")
         self.pipe = pipeline(
             "text-generation",
             model=self.model,
-            tokenizer=self.tokenizer
+            tokenizer=self.tokenizer,
+            eos_token_id=self.tokenizer.eos_token_id,
         )
-
         self.__prepare_few_shot_data()
 
     def __prepare_few_shot_data(self):
