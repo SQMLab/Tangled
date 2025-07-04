@@ -5,3 +5,8 @@ data/CommitDatabase.json
 *.pyc
 request.jsonl
 .config
+/data/DatasetWithNoise
+/data/DatasetWithoutNoise
+/data/DatasetWithoutTangledNoise
+/data/NoiseFreeDataset
+/data/NoisyDataset
