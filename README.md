@@ -31,7 +31,21 @@ Each sample includes:
 - Noise-Fre Method-level bug dataset at method's inception: [NoiseFreeDataset](./data/NoiseFreeDataset//)
 
 
+## 📦 Repository Description
+
+### [modules](./modules) Folder
+- [CliffsDelta.py](./modules/CliffsDelta.py): Calculate Cliff's Delta effect size.
+- [Untangler.py](./modules/Untangler.py): Detect tangled changes using LLM. Dependency: [.config](./.config) file.
+- [utilities.py](./modules/utilities.py): Utility functions.
+
+### Jupyter Notebooks
+- [GoldSetCreator.ipynb](./GoldSetCreator.ipynb): Creates the gold set.
+- [NoiseReduction.ipynb](./NoiseReduction.ipynb): Extract data, Remove noises and creates the Noisy and Less-Noisy dataset.
+
+
 ## 🔬 Reproducing Paper Results
+
+Ensure the .config file is correctly populated with API keys.
 
 ### RQ1
 - Run [RQ1.ipynb](./RQ1.ipynb) to reproduce the results of RQ1.
