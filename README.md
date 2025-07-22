@@ -27,8 +27,8 @@ Each sample includes:
 
 ### Bug Dataset
 - [49 Java open-source projects](https://github.com/shaifulcse/dataset-MLBP-2022) dataset by Chowdhury et al.
-- Noisy Method-level bug dataset at method's inception: [NoisyDataset](./data/NoisyDataset/)
-- Noise-Fre Method-level bug dataset at method's inception: [NoiseFreeDataset](./data/NoiseFreeDataset//)
+- Noisy Method-level bug dataset at method's inception: [NoisyDataset](./data/NoisyDataset/) folder.
+- Noise-Fre Method-level bug dataset at method's inception: [NoiseFreeDataset](./data/NoiseFreeDataset/) folder.
 
 
 ## 📦 Repository Description
