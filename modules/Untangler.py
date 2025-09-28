@@ -503,7 +503,7 @@ class OpenUntangler(BaseUntangler):
             raise ValueError("Provide a new diff using prepare_prompt()")
         start = time.time()
         self.log("Detecting...")
-        output = self.pipe(self.prompt)
+        output = self.pipe(self.prompt, max_new_tokens=100000)
         prediction = output[0]["generated_text"][-1]["content"]
 
         self.log(f"Output: {prediction}")
