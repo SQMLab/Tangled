@@ -1,3 +1,5 @@
+import logging
+from venv import logger
 from google import genai
 from openai import OpenAI
 import configparser
@@ -407,33 +409,25 @@ class OpenAIUntangler(BaseUntangler):
 
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import pipeline
 
-class FreeUntangler(BaseUntangler):
-    def __init__(self, model_name="microsoft/Phi-3-mini-4k-instruct", include_msg=True, shot_count=0, enable_cot=False):
+class OpenUntangler(BaseUntangler):
+    def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, logger = None):
         super().__init__(model_name, include_msg, shot_count, enable_cot)
+        self.logger = logger
         self.__setup()
 
-    def __setup(self):
-        config = configparser.ConfigParser()
-        config.read(".config")
-        hf_token=config["API_KEYS"]["HF_TOKEN"]
+    def log(self, msg, level = logging.INFO):
+        if self.logger:
+            self.logger.log(level, msg)
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            #device_map="cuda",
-            torch_dtype="auto",
-            trust_remote_code=True,
-            token=hf_token
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, token=hf_token)
-        print(f"Max Token: {self.tokenizer.model_max_length}")
+    def __setup(self):
         self.pipe = pipeline(
             "text-generation",
-            model=self.model,
-            tokenizer=self.tokenizer,
-            eos_token_id=self.tokenizer.eos_token_id,
-        )
+            model=self.model_name,
+            torch_dtype="auto",
+            device_map="auto",
+            )
         self.__prepare_few_shot_data()
 
     def __prepare_few_shot_data(self):
@@ -498,16 +492,24 @@ class FreeUntangler(BaseUntangler):
                 }
             )
         
-        messages[0]["content"] = self.initial_prompt + "\n" + messages[0]["content"]
+        if "gemma" in self.model_name.lower():
+            messages[0]["content"] = self.initial_prompt + "\n" + messages[0]["content"]
+        else:
+            messages.insert(0, {"role": "system", "content": self.initial_prompt})
         self.prompt = messages
 
     def detect(self):
         if self.prompt == "":
             raise ValueError("Provide a new diff using prepare_prompt()")
+        start = time.time()
+        self.log("Detecting...")
         output = self.pipe(self.prompt)
         prediction = output[0]["generated_text"][-1]["content"]
+        duration = time.time() - start
+        self.log(f"Detection in {duration}s")
 
         if self.enable_cot:
+            self.log("Extracting COT result.")
             return self.extract_cot_based_result(prediction)
 
         return prediction.strip()
@@ -520,8 +522,9 @@ class FreeUntangler(BaseUntangler):
 
         for index, row in tqdm(df.iterrows()):
             error = True
+            self.log(f"Preparing prompt - {index}.")
             self.prepare_prompt(row["CommitMessage"], row["Diff"])
-
+            self.log(f"Prompt - {self.prompt}.")
             while error:
                 try:
                     pred = self.detect()
@@ -538,6 +541,7 @@ class FreeUntangler(BaseUntangler):
             else:
                 explanations.append("")
                 answers.append(pred)
+            self.log(f"Done - {index}")
 
         df["Detection"] = answers
         if self.enable_cot:
