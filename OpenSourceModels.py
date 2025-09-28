@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
         logger.info("Starting detection.")
         result = untangler.batch_detect(df)
-        logger("Detection complete.")
+        logger.info("Detection complete.")
 
         if os.path.exists(csv_file_path):
             logger.info("Loading old result file to merge")

@@ -505,6 +505,8 @@ class OpenUntangler(BaseUntangler):
         self.log("Detecting...")
         output = self.pipe(self.prompt)
         prediction = output[0]["generated_text"][-1]["content"]
+
+        self.log(f"Output: {prediction}")
         duration = time.time() - start
         self.log(f"Detection in {duration}s")
 
