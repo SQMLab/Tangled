@@ -414,6 +414,7 @@ from transformers import pipeline
 class OpenUntangler(BaseUntangler):
     def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, logger = None):
         super().__init__(model_name, include_msg, shot_count, enable_cot)
+        self.batch_size = 8
         self.logger = logger
         self.__setup()
 
@@ -427,6 +428,7 @@ class OpenUntangler(BaseUntangler):
             model=self.model_name,
             torch_dtype="auto",
             device_map="auto",
+            batch_size=self.batch_size
             )
         self.__prepare_few_shot_data()
 
@@ -518,24 +520,20 @@ class OpenUntangler(BaseUntangler):
 
     def batch_detect(self, df):
         df = df.copy()
+        prompts = []
+        self.log("Preparing batch prompts.")
+        for index, row in tqdm(df.iterrows()):
+            self.prepare_prompt(row["CommitMessage"], row["Diff"])
+            prompts.append(self.prompt)
+            
+        self.log("Prompts are ready. Starting batch detectiom.")
+        results = self.pipe(prompts, max_new_tokens=100000)
+        self.log("Detectiom complete.")
 
+        self.log("Processing outputs.")
         explanations = []
         answers = []
-
-        for index, row in tqdm(df.iterrows()):
-            error = True
-            self.log(f"Preparing prompt - {index}.")
-            self.prepare_prompt(row["CommitMessage"], row["Diff"])
-            self.log(f"Prompt - {self.prompt}.")
-            while error:
-                try:
-                    pred = self.detect()
-                    error = False
-                except Exception as e:
-                    error = True
-                    print(f"Error - {e}.\nRetrying...")
-                    time.sleep(1)
-
+        for pred in results:
             if self.enable_cot:
                 e, a = self.extract_cot_based_result(pred)
                 explanations.append(e)
@@ -543,7 +541,7 @@ class OpenUntangler(BaseUntangler):
             else:
                 explanations.append("")
                 answers.append(pred)
-            self.log(f"Done - {index}")
+        self.log(f"Output processing complete.")
 
         df["Detection"] = answers
         if self.enable_cot:
