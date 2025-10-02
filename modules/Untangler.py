@@ -414,7 +414,7 @@ from transformers import pipeline
 class OpenUntangler(BaseUntangler):
     def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, logger = None):
         super().__init__(model_name, include_msg, shot_count, enable_cot)
-        self.batch_size = 8
+        self.batch_size = 16
         self.logger = logger
         self.__setup()
 
@@ -430,6 +430,9 @@ class OpenUntangler(BaseUntangler):
             device_map="auto",
             batch_size=self.batch_size
             )
+        self.pipe.tokenizer.padding_side = "left"
+        if self.pipe.tokenizer.pad_token is None:
+            self.pipe.tokenizer.pad_token = self.pipe.tokenizer.eos_token
         self.__prepare_few_shot_data()
 
     def __prepare_few_shot_data(self):
@@ -527,7 +530,20 @@ class OpenUntangler(BaseUntangler):
             prompts.append(self.prompt)
             
         self.log("Prompts are ready. Starting batch detectiom.")
-        results = self.pipe(prompts, max_new_tokens=100000)
+        results = []
+
+        # Iterate over batches and store results
+        for i in range(0, len(prompts), self.batch_size):
+            batch = prompts[i:i + self.batch_size]
+            result = self.pipe(batch, batch_size=self.batch_size)
+            result = [res[0]["generated_text"][-1]["content"] for res in result]
+            results.extend(result)
+
+            os.makedirs("./temp", exist_ok=True)
+            df["Detection"] = results + [""] * (len(df) - len(results))
+            name = self.model_name.split("/")[-1]
+            df.to_csv(f"./temp/{name}_{self.include_msg}_{self.shot_count}_{self.enable_cot}.csv", index=False)
+            self.log(f"Processed {min(i + self.batch_size, len(prompts))}/{len(prompts)} items.")
         self.log("Detectiom complete.")
 
         self.log("Processing outputs.")

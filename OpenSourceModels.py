@@ -108,7 +108,7 @@ if __name__ == "__main__":
         logger.info("Job Successful.")
     except Exception as e:
         logger.error("Job Failed.")
-        logger.exception()
+        logger.exception("Exception occurred", exc_info=True)
 
         raise e
 
