@@ -1,5 +1,6 @@
 import logging
 from venv import logger
+from click import prompt
 from google import genai
 from openai import OpenAI
 import configparser
@@ -408,13 +409,12 @@ class OpenAIUntangler(BaseUntangler):
         return batch, df
 
 
-import torch
+import torch, gc
 from transformers import pipeline
 
 class OpenUntangler(BaseUntangler):
-    def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, batch_size = 8, logger = None):
+    def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, logger = None):
         super().__init__(model_name, include_msg, shot_count, enable_cot)
-        self.batch_size = batch_size
         self.logger = logger
         self.__setup()
 
@@ -425,6 +425,7 @@ class OpenUntangler(BaseUntangler):
     def __setup(self):
         self.log("Number of GPUs available: " + str(torch.cuda.device_count()))
         max_mem = {i: "78GiB" for i in range(torch.cuda.device_count())}
+
         self.pipe = pipeline(
             "text-generation",
             model=self.model_name,
@@ -435,6 +436,10 @@ class OpenUntangler(BaseUntangler):
         self.pipe.tokenizer.padding_side = "left"
         if self.pipe.tokenizer.pad_token is None:
             self.pipe.tokenizer.pad_token = self.pipe.tokenizer.eos_token
+
+        self.pipe.model.eval()
+        torch.set_grad_enabled(False)
+
         self.__prepare_few_shot_data()
 
     def __prepare_few_shot_data(self):
@@ -523,46 +528,43 @@ class OpenUntangler(BaseUntangler):
 
         return prediction.strip()
 
-    def batch_detect(self, df):
+    def batch_detect(self, df, callback=None):
         df = df.copy()
-        prompts = []
-        self.log("Preparing batch prompts.")
+
+        if "Detection" not in df.columns:
+            df["Detection"] = ""
+        if "Explanation" not in df.columns and self.enable_cot:
+            df["Explanation"] = ""
+
         for index, row in tqdm(df.iterrows()):
+            if row["Detection"] != "":
+                self.log(f"Skipping: {index}")
+                continue
+
+            self.log(f"Detecting: {index}")
+            start = time.time()
+
             self.prepare_prompt(row["CommitMessage"], row["Diff"])
-            prompts.append(self.prompt)
+            result = self.pipe(self.prompt, max_new_tokens=100000)
+            pred = result[0]["generated_text"][-1]["content"]
             
-        self.log("Prompts are ready. Starting batch detectiom.")
-        results = []
+            duration = time.time() - start
+            self.log(f"Detection in {duration}s")
 
-        # Iterate over batches and store results
-        for i in range(0, len(prompts), self.batch_size):
-            batch = prompts[i:i + self.batch_size]
-            result = self.pipe(batch, batch_size=self.batch_size)
-            result = [res[0]["generated_text"][-1]["content"] for res in result]
-            results.extend(result)
-
-            os.makedirs("./temp", exist_ok=True)
-            df["Detection"] = results + [""] * (len(df) - len(results))
-            name = self.model_name.split("/")[-1]
-            df.to_csv(f"./temp/{name}_{self.include_msg}_{self.shot_count}_{self.enable_cot}.csv", index=False)
-            self.log(f"Processed {min(i + self.batch_size, len(prompts))}/{len(prompts)} items.")
-        self.log("Detectiom complete.")
-
-        self.log("Processing outputs.")
-        explanations = []
-        answers = []
-        for pred in results:
             if self.enable_cot:
                 e, a = self.extract_cot_based_result(pred)
-                explanations.append(e)
-                answers.append(a)
+                df.loc[index, "Explanation"] = e
+                df.loc[index, "Detection"] = a
             else:
-                explanations.append("")
-                answers.append(pred)
-        self.log(f"Output processing complete.")
+                df.loc[index, "Detection"] = pred
 
-        df["Detection"] = answers
-        if self.enable_cot:
-            df["Explanation"] = explanations
+            del result
+            gc.collect()
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
 
+            if callback is not None:
+                callback(df)
+
+        self.log(f"Detection complete.")
         return df
