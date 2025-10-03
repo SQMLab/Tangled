@@ -1,6 +1,4 @@
 import logging
-from venv import logger
-from click import prompt
 from google import genai
 from openai import OpenAI
 import configparser
@@ -12,7 +10,6 @@ import os
 import io
 import re
 import tiktoken
-
 
 class BaseUntangler:
     def __init__(self, model_name="", include_msg=True, shot_count=0, enable_cot=False):
@@ -431,8 +428,8 @@ class OpenUntangler(BaseUntangler):
             model=self.model_name,
             torch_dtype="auto",
             device_map="auto",
-            max_memory=max_mem
-            )
+            model_kwargs = {"max_memory":max_mem}
+        )
         self.pipe.tokenizer.padding_side = "left"
         if self.pipe.tokenizer.pad_token is None:
             self.pipe.tokenizer.pad_token = self.pipe.tokenizer.eos_token

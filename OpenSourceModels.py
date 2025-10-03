@@ -64,9 +64,6 @@ if __name__ == "__main__":
 
         logger.info("Job Starting.")
         logger.info(f"Job Id: {job_id}, Model: {model_id}, RQ: {config_map[rq][1]}")
-
-        logger.info("Loading dataset.")
-        df = pd.read_csv("./data/Complete_GoldSet.csv")
         
         logger.info("Setting variables and creating result folders.")
         if rq in config_map:
@@ -81,6 +78,13 @@ if __name__ == "__main__":
         csv_file_path = f"{save_path}/{model_name}.csv"
         
         untangler = OpenUntangler(*args)
+
+
+        logger.info("Loading dataset.")
+        if os.path.exists(csv_file_path):
+            df = pd.read_csv(csv_file_path)
+        else:
+            df = pd.read_csv("./data/Complete_GoldSet.csv")
 
         logger.info("Starting detection.")
         result = untangler.batch_detect(df, save_csv)
