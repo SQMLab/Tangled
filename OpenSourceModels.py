@@ -65,11 +65,11 @@ if __name__ == "__main__":
 
     try:
         config_map = {
-            11: ("./Results/RQ1", "WithoutMsg", (model_id, False, 0, False, logger)),
-            12: ("./Results/RQ1", "WithMsg", (model_id, True, 0, False, logger)),
-            21: ("./Results/RQ2", "FewShot", (model_id, True, 2, False, logger)),
-            22: ("./Results/RQ2", "COT", (model_id, True, 0, True, logger)),
-            23: ("./Results/RQ2", "FewShotCOT", (model_id, True, 2, True, logger)),
+            11: ("./Results/RQ1", "WithoutMsg", (model_id, False, 0, False, 8, logger)),
+            12: ("./Results/RQ1", "WithMsg", (model_id, True, 0, False, 8, logger)),
+            21: ("./Results/RQ2", "FewShot", (model_id, True, 2, False, 8, logger)),
+            22: ("./Results/RQ2", "COT", (model_id, True, 0, True, 8, logger)),
+            23: ("./Results/RQ2", "FewShotCOT", (model_id, True, 2, True, 8, logger)),
         }
 
         logger.info("Job Starting.")

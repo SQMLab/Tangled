@@ -412,9 +412,9 @@ import torch
 from transformers import pipeline
 
 class OpenUntangler(BaseUntangler):
-    def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, logger = None):
+    def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, batch_size = 8, logger = None):
         super().__init__(model_name, include_msg, shot_count, enable_cot)
-        self.batch_size = 16
+        self.batch_size = batch_size
         self.logger = logger
         self.__setup()
 
@@ -423,12 +423,14 @@ class OpenUntangler(BaseUntangler):
             self.logger.log(level, msg)
 
     def __setup(self):
+        self.log("Number of GPUs available: " + str(torch.cuda.device_count()))
+        max_mem = {i: "78GiB" for i in range(torch.cuda.device_count())}
         self.pipe = pipeline(
             "text-generation",
             model=self.model_name,
             torch_dtype="auto",
             device_map="auto",
-            batch_size=self.batch_size
+            max_memory=max_mem
             )
         self.pipe.tokenizer.padding_side = "left"
         if self.pipe.tokenizer.pad_token is None:
