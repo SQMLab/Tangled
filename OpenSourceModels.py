@@ -63,13 +63,14 @@ if __name__ == "__main__":
     parse_arguments()
     setup_logging()
 
+    batch_size = 2
     try:
         config_map = {
-            11: ("./Results/RQ1", "WithoutMsg", (model_id, False, 0, False, 8, logger)),
-            12: ("./Results/RQ1", "WithMsg", (model_id, True, 0, False, 8, logger)),
-            21: ("./Results/RQ2", "FewShot", (model_id, True, 2, False, 8, logger)),
-            22: ("./Results/RQ2", "COT", (model_id, True, 0, True, 8, logger)),
-            23: ("./Results/RQ2", "FewShotCOT", (model_id, True, 2, True, 8, logger)),
+            11: ("./Results/RQ1", "WithoutMsg", (model_id, False, 0, False, batch_size, logger)),
+            12: ("./Results/RQ1", "WithMsg", (model_id, True, 0, False, batch_size, logger)),
+            21: ("./Results/RQ2", "FewShot", (model_id, True, 2, False, batch_size, logger)),
+            22: ("./Results/RQ2", "COT", (model_id, True, 0, True, batch_size, logger)),
+            23: ("./Results/RQ2", "FewShotCOT", (model_id, True, 2, True, batch_size, logger)),
         }
 
         logger.info("Job Starting.")

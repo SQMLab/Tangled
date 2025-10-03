@@ -1,5 +1,4 @@
 import logging
-from venv import logger
 from google import genai
 from openai import OpenAI
 import configparser
@@ -11,7 +10,7 @@ import os
 import io
 import re
 import tiktoken
-
+from datetime import datetime
 
 class BaseUntangler:
     def __init__(self, model_name="", include_msg=True, shot_count=0, enable_cot=False):
@@ -408,8 +407,8 @@ class OpenAIUntangler(BaseUntangler):
         return batch, df
 
 
-import torch
-from transformers import pipeline
+import torch, gc
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 class OpenUntangler(BaseUntangler):
     def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, batch_size = 8, logger = None):
@@ -425,16 +424,27 @@ class OpenUntangler(BaseUntangler):
     def __setup(self):
         self.log("Number of GPUs available: " + str(torch.cuda.device_count()))
         max_mem = {i: "78GiB" for i in range(torch.cuda.device_count())}
+
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        tokenizer.padding_side = "left"
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        model = AutoModelForCausalLM.from_pretrained(
+            self.model_name,
+            device_map="auto",
+            torch_dtype="auto",
+            max_memory=max_mem,
+            attn_implementation="flash_attention_2",
+        )
+        model.eval()
+        torch.set_grad_enabled(False)
         self.pipe = pipeline(
             "text-generation",
-            model=self.model_name,
-            torch_dtype="auto",
-            device_map="auto",
-            max_memory=max_mem
-            )
-        self.pipe.tokenizer.padding_side = "left"
-        if self.pipe.tokenizer.pad_token is None:
-            self.pipe.tokenizer.pad_token = self.pipe.tokenizer.eos_token
+            model=model,
+            tokenizer=tokenizer
+        )
+        
         self.__prepare_few_shot_data()
 
     def __prepare_few_shot_data(self):
@@ -510,7 +520,7 @@ class OpenUntangler(BaseUntangler):
             raise ValueError("Provide a new diff using prepare_prompt()")
         start = time.time()
         self.log("Detecting...")
-        output = self.pipe(self.prompt, max_new_tokens=100000)
+        output = self.pipe(self.prompt, max_new_tokens=10000)
         prediction = output[0]["generated_text"][-1]["content"]
 
         self.log(f"Output: {prediction}")
@@ -537,15 +547,21 @@ class OpenUntangler(BaseUntangler):
         # Iterate over batches and store results
         for i in range(0, len(prompts), self.batch_size):
             batch = prompts[i:i + self.batch_size]
-            result = self.pipe(batch, batch_size=self.batch_size)
+            result = self.pipe(batch, batch_size=self.batch_size, max_new_tokens=10000, do_sample=False, temperature=0.3)
             result = [res[0]["generated_text"][-1]["content"] for res in result]
             results.extend(result)
 
             os.makedirs("./temp", exist_ok=True)
             df["Detection"] = results + [""] * (len(df) - len(results))
-            name = self.model_name.split("/")[-1]
+            name = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + "_" +self.model_name.split("/")[-1]
             df.to_csv(f"./temp/{name}_{self.include_msg}_{self.shot_count}_{self.enable_cot}.csv", index=False)
             self.log(f"Processed {min(i + self.batch_size, len(prompts))}/{len(prompts)} items.")
+
+            del result
+            gc.collect()
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+
         self.log("Detectiom complete.")
 
         self.log("Processing outputs.")
