@@ -23,7 +23,7 @@ module load python/3.11
 cd /home/opumni/projects/def-shaiful/opumni
 source venv/llm/bin/activate
 
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:256,garbage_collection_threshold:0.8
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export HF_TOKEN=<token>
 export HF_HOME=$SLURM_TMPDIR/hf_cache
 
