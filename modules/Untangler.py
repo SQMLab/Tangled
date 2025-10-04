@@ -529,12 +529,12 @@ class OpenUntangler(BaseUntangler):
         df = df.copy()
 
         if "Detection" not in df.columns:
-            df["Detection"] = ""
+            df["Detection"] = None
         if "Explanation" not in df.columns and self.enable_cot:
-            df["Explanation"] = ""
+            df["Explanation"] = None
 
         for index, row in tqdm(df.iterrows()):
-            if "Detection" not in df.columns or row["Detection"] is None or pd.isna(row["Detection"]):
+            if "Detection" not in df.columns or row["Detection"] is None or pd.isna(row["Detection"]) or row["Detection"] == "" or len(row["Detection"].strip()) < 5:
                 self.log(f"Detecting: {index}")
                 start = time.time()
 
