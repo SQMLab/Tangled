@@ -534,7 +534,7 @@ class OpenUntangler(BaseUntangler):
             df["Explanation"] = ""
 
         for index, row in tqdm(df.iterrows()):
-            if row["Detection"] is None or pd.isna(row["Detection"]):
+            if "Detection" not in df.columns or row["Detection"] is None or pd.isna(row["Detection"]):
                 self.log(f"Detecting: {index}")
                 start = time.time()
 
