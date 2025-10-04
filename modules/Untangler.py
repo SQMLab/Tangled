@@ -534,7 +534,7 @@ class OpenUntangler(BaseUntangler):
             df["Explanation"] = ""
 
         for index, row in tqdm(df.iterrows()):
-            if row["Detection"] != "":
+            if row["Detection"] != "" or row["Detection"] is not None:
                 self.log(f"Skipping: {index}")
                 continue
 
