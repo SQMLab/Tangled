@@ -534,34 +534,32 @@ class OpenUntangler(BaseUntangler):
             df["Explanation"] = ""
 
         for index, row in tqdm(df.iterrows()):
-            if row["Detection"] != "" or row["Detection"] is not None:
+            if row["Detection"] is None or pd.isna(row["Detection"]):
+                self.log(f"Detecting: {index}")
+                start = time.time()
+
+                self.prepare_prompt(row["CommitMessage"], row["Diff"])
+                result = self.pipe(self.prompt, max_new_tokens=100000)
+                pred = result[0]["generated_text"][-1]["content"]
+                
+                duration = time.time() - start
+                self.log(f"Detection in {duration}s")
+
+                if self.enable_cot:
+                    e, a = self.extract_cot_based_result(pred)
+                    df.loc[index, "Explanation"] = e
+                    df.loc[index, "Detection"] = a
+                else:
+                    df.loc[index, "Detection"] = pred
+
+                del result
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.reset_peak_memory_stats()
+
+                if callback is not None:
+                    callback(df)
+            else:
                 self.log(f"Skipping: {index}")
                 continue
-
-            self.log(f"Detecting: {index}")
-            start = time.time()
-
-            self.prepare_prompt(row["CommitMessage"], row["Diff"])
-            result = self.pipe(self.prompt, max_new_tokens=100000)
-            pred = result[0]["generated_text"][-1]["content"]
-            
-            duration = time.time() - start
-            self.log(f"Detection in {duration}s")
-
-            if self.enable_cot:
-                e, a = self.extract_cot_based_result(pred)
-                df.loc[index, "Explanation"] = e
-                df.loc[index, "Detection"] = a
-            else:
-                df.loc[index, "Detection"] = pred
-
-            del result
-            gc.collect()
-            torch.cuda.empty_cache()
-            torch.cuda.reset_peak_memory_stats()
-
-            if callback is not None:
-                callback(df)
-
-        self.log(f"Detection complete.")
         return df
