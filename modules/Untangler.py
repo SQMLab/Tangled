@@ -125,7 +125,7 @@ class GeminiUntangler(BaseUntangler):
                 answer = item["Answer"].strip()
 
                 if self.include_msg:
-                    input = f"\nCommit Messaage: {commit_message}\nGit Diff:\n{git_diff}"
+                    input = f"\nCommit Message: {commit_message}\nGit Diff:\n{git_diff}"
                 else:
                     input = f"\nGit Diff:\n{git_diff}"
 
@@ -140,7 +140,7 @@ class GeminiUntangler(BaseUntangler):
 
     def prepare_prompt(self, commitMessage, diff):
         if self.include_msg:
-            question = f"\nCommit Messaage: {commitMessage}\nGit Diff:\n{diff}\nAnswer:"
+            question = f"\nCommit Message: {commitMessage}\nGit Diff:\n{diff}\nAnswer:"
         else:
             question = f"Git Diff:\n{diff}\nAnswer:"
 
@@ -235,7 +235,7 @@ class OpenAIUntangler(BaseUntangler):
                     few_shots.append(
                         {
                             "role": "user",
-                            "content": f"Commit Messaage: {commit_message}\nGit Diff:\n{git_diff}",
+                            "content": f"Commit Message: {commit_message}\nGit Diff:\n{git_diff}",
                         }
                     )
                 else:
@@ -267,7 +267,7 @@ class OpenAIUntangler(BaseUntangler):
             messages.append(
                 {
                     "role": "user",
-                    "content": f"Commit Messaage: {commitMessage}\nGit Diff:\n{diff}",
+                    "content": f"Commit Message: {commitMessage}\nGit Diff:\n{diff}",
                 }
             )
         else:
@@ -422,14 +422,18 @@ class OpenUntangler(BaseUntangler):
     def __setup(self):
         self.log("Number of GPUs available: " + str(torch.cuda.device_count()))
         max_mem = {i: "78GiB" for i in range(torch.cuda.device_count())}
-        max_mem[0] = "74GiB"
+        max_mem[0] = "65GiB"
 
         self.pipe = pipeline(
             "text-generation",
             model=self.model_name,
-            torch_dtype="auto",
-            device_map="auto",
-            model_kwargs = {"max_memory":max_mem}
+            dtype=torch.float16,
+            device_map="balanced_low_0", 
+            truncation=True,
+            model_kwargs = {
+                "max_memory":max_mem,
+                "offload_folder": "./offload"
+            },
         )
 
         try:
@@ -466,7 +470,7 @@ class OpenUntangler(BaseUntangler):
                     few_shots.append(
                         {
                             "role": "user",
-                            "content": f"Commit Messaage: {commit_message}\nGit Diff:\n{git_diff}",
+                            "content": f"Commit Message: {commit_message}\nGit Diff:\n{git_diff}",
                         }
                     )
                 else:
@@ -498,7 +502,7 @@ class OpenUntangler(BaseUntangler):
             messages.append(
                 {
                     "role": "user",
-                    "content": f"Commit Messaage: {commitMessage}\nGit Diff:\n{diff}",
+                    "content": f"Commit Message: {commitMessage}\nGit Diff:\n{diff}",
                 }
             )
         else:
@@ -520,7 +524,7 @@ class OpenUntangler(BaseUntangler):
             raise ValueError("Provide a new diff using prepare_prompt()")
         start = time.time()
         self.log("Detecting...")
-        output = self.pipe(self.prompt, max_new_tokens=100000)
+        output = self.pipe(self.prompt, max_new_tokens=100000, do_sample=False)
         prediction = output[0]["generated_text"][-1]["content"]
 
         self.log(f"Output: {prediction}")
@@ -543,15 +547,15 @@ class OpenUntangler(BaseUntangler):
 
         with torch.inference_mode():
             for index, row in tqdm(df.iterrows()):
-                if index == 180 and "gpt-oss-120b" in self.model_name:
-                    self.log("Skipping index 180 for gpt-oss-120b due to OOM issues", logging.WARNING)
-                    continue
+                # if index == 180 and "gpt-oss-120b" in self.model_name:
+                #     self.log("Skipping index 180 for gpt-oss-120b due to OOM issues", logging.WARNING)
+                #     continue
                 if "Detection" not in df.columns or row["Detection"] is None or pd.isna(row["Detection"]) or row["Detection"] == "" or len(row["Detection"].strip()) < 5:
                     self.log(f"Detecting: {index}")
                     start = time.time()
 
                     self.prepare_prompt(row["CommitMessage"], row["Diff"])
-                    result = self.pipe(self.prompt, max_new_tokens=10000)
+                    result = self.pipe(self.prompt, truncation=True, max_new_tokens=10000)
                     pred = result[0]["generated_text"][-1]["content"]
                     
                     duration = time.time() - start
