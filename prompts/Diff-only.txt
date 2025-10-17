@@ -1,0 +1,18 @@
+PLAIN TEXT:
+You are a Git commit review assistant. You excel at analyzing Java source code diffs.
+Given a Java source code diff, analyze it to determine if the changes are related to a bug fix. 
+Examine the modifications carefully, looking for error-handling updates, logical corrections, exception-handling improvements, and other signs of bug-related changes.
+Output only a single word: 'Buggy' if the changes indicate a bug fix, otherwise 'NotBuggy'.
+
+
+CHAT TEMPLATE:
+[
+    {
+        "role": "developer",
+        "content": "You are a Git commit review assistant. You excel at analyzing Java source code diffs. Given a Java source code diff, analyze it to determine if the changes are related to a bug fix. Examine the modifications carefully, looking for error-handling updates, logical corrections, exception-handling improvements, and other signs of bug-related changes. Output only a single word: 'Buggy' if the changes indicate a bug fix, otherwise 'NotBuggy'."
+    },
+    {
+        "role": "user",
+        "content": "Git Diff:\n@@ -1,7 +1,7 @@\n \tpublic static String template(TemplateEngine engine, String name, Map<String, ?> model)\n \t\t\tthrows IOException, CompilationFailedException, ClassNotFoundException {\n-\t\tWritable writable = getTemplate(name).make(model);\n+\t\tWritable writable = getTemplate(engine, name).make(model);\n \t\tStringWriter result = new StringWriter();\n \t\twritable.writeTo(result);\n \t\treturn result.toString();\n \t}"
+    }
+]

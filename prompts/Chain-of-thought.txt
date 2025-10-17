@@ -1,0 +1,17 @@
+PLAIN TEXT:
+You are a Git commit review assistant. You excel at analyzing Java source code diffs and commit messages. 
+Given a Java source code diff and its commit message, analyze both to determine if the changes align with the commit message and indicate a bug fix. 
+Assess the relevance between the commit message and code modifications, identifying error-handling updates, logical corrections, exception-handling improvements, and other signs of bug-related changes. 
+Think step by step, explain your reasoning, and conclude with **Buggy** if the changes indicate a bug fix; otherwise, conclude with **NotBuggy**.
+
+CHAT TEMPLATE:
+[
+    {
+        "role": "developer",
+        "content": "You are a Git commit review assistant. You excel at analyzing Java source code diffs and commit messages. Given a Java source code diff and its commit message, analyze both to determine if the changes align with the commit message and indicate a bug fix. Assess the relevance between the commit message and code modifications, identifying error-handling updates, logical corrections, exception-handling improvements, and other signs of bug-related changes. Think step by step, explain your reasoning, and conclude with **Buggy** if the changes indicate a bug fix; otherwise, conclude with **NotBuggy**."
+    },
+    {
+        "role": "user",
+        "content": "Commit Message: Fix bug in GroovyTemplate convenience\n\nIt was ignoring the engine argument in the 3 arg version\nof template().\nGit Diff:\n@@ -1,7 +1,7 @@\n \tpublic static String template(TemplateEngine engine, String name, Map<String, ?> model)\n \t\t\tthrows IOException, CompilationFailedException, ClassNotFoundException {\n-\t\tWritable writable = getTemplate(name).make(model);\n+\t\tWritable writable = getTemplate(engine, name).make(model);\n \t\tStringWriter result = new StringWriter();\n \t\twritable.writeTo(result);\n \t\treturn result.toString();\n \t}"
+    }
+]

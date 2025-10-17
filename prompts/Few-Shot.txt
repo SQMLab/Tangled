@@ -1,0 +1,80 @@
+PLAIN TEXT:
+You are a Git commit review assistant. You excel at analyzing Java source code diffs and commit messages. 
+Given a Java source code diff and its commit message, analyze both to determine if the changes align with the commit message and indicate a bug fix. 
+Assess the relevance between the commit message and code modifications, identifying error-handling updates, logical corrections, exception-handling improvements, and other signs of bug-related changes. 
+Output only a single word: 'Buggy' if the changes indicate a bug fix, otherwise 'NotBuggy'.
+
+Commit Message: Fix bug in InetAddresses and performance problem in InternetDomainName (changed from regex to CharMatcher). This is intended as the last code update before release 06.
+Git Diff:
+@@ -1,18 +1,18 @@
+   private static boolean validateSyntax(List<String> parts) {
+     final int lastIndex = parts.size() - 1;
+
+     // Validate the last part specially, as it has different syntax rules.
+
+-    if (!validatePart(parts.get(lastIndex), FINAL_PART)) {
++    if (!validatePart(parts.get(lastIndex), true)) {
+       return false;
+     }
+
+     for (int i = 0; i < lastIndex; i++) {
+       String part = parts.get(i);
+-      if (!validatePart(part, NORMAL_PART)) {
++      if (!validatePart(part, false)) {
+         return false;
+       }
+     }
+
+     return true;
+   }
+
+NotBuggy
+
+Commit Message: Fix bug in InetAddresses and performance problem in InternetDomainName (changed from regex to CharMatcher). This is intended as the last code update before release 06.
+Git Diff:
+@@ -1,12 +1,12 @@
+   private static String convertDottedQuadToHex(String ipString) {
+     int lastColon = ipString.lastIndexOf(':');
+     String initialPart = ipString.substring(0, lastColon + 1);
+     String dottedQuad = ipString.substring(lastColon + 1);
+     byte[] quad = textToNumericFormatV4(dottedQuad);
+     if (quad == null) {
+       return null;
+     }
+-    String penultimate = Integer.toHexString((quad[0] << 8) | (quad[1] & 0xff));
+-    String ultimate = Integer.toHexString((quad[2] << 8) | (quad[3] & 0xff));
++    String penultimate = Integer.toHexString(((quad[0] & 0xff) << 8) | (quad[1] & 0xff));
++    String ultimate = Integer.toHexString(((quad[2] & 0xff) << 8) | (quad[3] & 0xff));
+     return initialPart + penultimate + ":" + ultimate;
+   }
+
+Buggy
+
+
+CHAT TEMPLATE:
+[
+    {
+        "role": "developer",
+        "content": "You are a Git commit review assistant. You excel at analyzing Java source code diffs and commit messages. Given a Java source code diff and its commit message, analyze both to determine if the changes align with the commit message and indicate a bug fix. Assess the relevance between the commit message and code modifications, identifying error-handling updates, logical corrections, exception-handling improvements, and other signs of bug-related changes. Output only a single word: 'Buggy' if the changes indicate a bug fix, otherwise 'NotBuggy'."
+    },
+    {
+        "role": "user",
+        "content": "Commit Message: Fix bug in InetAddresses and performance problem in InternetDomainName (changed from regex to CharMatcher). This is intended as the last code update before release 06.\nGit Diff:\n@@ -1,18 +1,18 @@\n   private static boolean validateSyntax(List<String> parts) {\n     final int lastIndex = parts.size() - 1;\n \n // Validate the last part specially, as it has different syntax rules.\n \n-    if (!validatePart(parts.get(lastIndex), FINAL_PART)) {\n+    if (!validatePart(parts.get(lastIndex), true)) {\n       return false;\n     }\n \n     for (int i = 0; i < lastIndex; i++) {\n       String part = parts.get(i);\n-      if (!validatePart(part, NORMAL_PART)) {\n+      if (!validatePart(part, false)) {\n         return false;\n       }\n     }\n \n     return true;\n   }"
+    },
+    {
+        "role": "assistant",
+        "content": "NotBuggy"
+    },
+    {
+        "role": "user",
+        "content": "Commit Message: Fix bug in InetAddresses and performance problem in InternetDomainName (changed from regex to CharMatcher). This is intended as the last code update before release 06.\nGit Diff:\n@@ -1,12 +1,12 @@\n   private static String convertDottedQuadToHex(String ipString) {\n     int lastColon = ipString.lastIndexOf(\':\');\n     String initialPart = ipString.substring(0, lastColon + 1);\n     String dottedQuad = ipString.substring(lastColon + 1);\n     byte[] quad = textToNumericFormatV4(dottedQuad);\n     if (quad == null) {\n       return null;\n     }\n-    String penultimate = Integer.toHexString((quad[0] << 8) | (quad[1] & 0xff));\n-    String ultimate = Integer.toHexString((quad[2] << 8) | (quad[3] & 0xff));\n+    String penultimate = Integer.toHexString(((quad[0] & 0xff) << 8) | (quad[1] & 0xff));\n+    String ultimate = Integer.toHexString(((quad[2] & 0xff) << 8) | (quad[3] & 0xff));\n     return initialPart + penultimate + "":"" + ultimate;\n   }"
+    },
+    {
+        "role": "assistant",
+        "content": "Buggy"
+    },
+    {
+        "role": "user",
+        "content": "Commit Message: Fix bug in GroovyTemplate convenience\n\nIt was ignoring the engine argument in the 3 arg version\nof template().\nGit Diff:\n@@ -1,7 +1,7 @@\n \tpublic static String template(TemplateEngine engine, String name, Map<String, ?> model)\n \t\t\tthrows IOException, CompilationFailedException, ClassNotFoundException {\n-\t\tWritable writable = getTemplate(name).make(model);\n+\t\tWritable writable = getTemplate(engine, name).make(model);\n \t\tStringWriter result = new StringWriter();\n \t\twritable.writeTo(result);\n \t\treturn result.toString();\n \t}"
+    }
+]
