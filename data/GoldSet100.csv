@@ -1,0 +1,3305 @@
+Project,File,CommitHash,Diff,Decision,CommitMessage
+lucene-solr,14425.json,4070bdd8d8b2095b406c404720e5f2c347596350,"@@ -1,23 +1,23 @@
+   public static ExecutorUtil.InheritableThreadLocalProvider getInheritableThreadLocalProvider() {
+     return new ExecutorUtil.InheritableThreadLocalProvider() {
+       @Override
+       public void store(AtomicReference ctx) {
+-        SolrRequestInfo me = threadLocal.get();
++        SolrRequestInfo me = SolrRequestInfo.getRequestInfo();
+         if (me != null) ctx.set(me);
+       }
+ 
+       @Override
+       public void set(AtomicReference ctx) {
+         SolrRequestInfo me = (SolrRequestInfo) ctx.get();
+         if (me != null) {
+           ctx.set(null);
+-          threadLocal.set(me);
++          SolrRequestInfo.setRequestInfo(me);
+         }
+       }
+ 
+       @Override
+       public void clean(AtomicReference ctx) {
+-        threadLocal.remove();
++        SolrRequestInfo.clearRequestInfo();
+       }
+     };
+   }
+\ No newline at end of file
+",Buggy,"SOLR-8657: Fix SolrRequestInfo error logs if QuerySenderListener is being used
+"
+sonarqube,12672.json,0584dc8d5d5d82a2035763c34afba0e12cf6e8d0,"@@ -1,3 +1,3 @@
+-  public List<String> selectGroupNamesByQueryAndTemplate(DbSession session, PermissionQuery query, long templateId) {
+-    return mapper(session).selectGroupNamesByQueryAndTemplate(query, templateId, new RowBounds(query.getPageOffset(), query.getPageSize()));
++  public List<String> selectGroupNamesByQueryAndTemplate(DbSession session, PermissionQuery query, String organizationUuid, long templateId) {
++    return mapper(session).selectGroupNamesByQueryAndTemplate(organizationUuid, templateId, query, new RowBounds(query.getPageOffset(), query.getPageSize()));
+   }
+\ No newline at end of file
+",Buggy,"SONAR-8682 fix error when filtering on name
+
+and a given group name exists in multiple organizations
+"
+ant,7722.json,588ce1fbe3c07994b03283ddeb82662bb23a2785,"@@ -1,7 +1,3 @@
+     public void setExecutable(String executable) {
+-        if (executable == null || executable.length() == 0) {
+-            return;
+-        }
+-        this.executable = executable.replace('/', File.separatorChar)
+-            .replace('\\', File.separatorChar);
++        setExecutable(executable, true);
+     }
+\ No newline at end of file
+",Buggy,"avoid slash translations for module names
+
+should fix Windows test errors introduced with #15
+"
+pmd,9191.json,4383ac357979bf353947351cac11d9586398ffbd,"@@ -1,15 +1,20 @@
+     public Object visit(ASTNullLiteral node, Object data) {
+-        if (lookUp(node) instanceof ASTStatementExpression) {
+-            Node n = lookUp(node);
++        if (get5thParent(node) instanceof ASTStatementExpression) {
++            ASTStatementExpression n = (ASTStatementExpression)get5thParent(node);
++
++            if (isAssignmentToFinalField(n)) {
++                return data;
++            }
++
+             if (n.jjtGetNumChildren() > 2 && n.jjtGetChild(1) instanceof ASTAssignmentOperator) {
+                 RuleContext ctx = (RuleContext) data;
+                 ctx.getReport().addRuleViolation(createRuleViolation(ctx, node));
+             }
+-        } else if (lookUp2(node) instanceof ASTConditionalExpression) {
+-            checkTernary((ASTConditionalExpression)lookUp2(node), data, node);
+-        } else if (lookUp(node) instanceof ASTConditionalExpression) {
+-            checkTernary((ASTConditionalExpression)lookUp(node), data, node);
++        } else if (get4thParent(node) instanceof ASTConditionalExpression) {
++            checkTernary((ASTConditionalExpression)get4thParent(node), data, node);
++        } else if (get5thParent(node) instanceof ASTConditionalExpression) {
++            checkTernary((ASTConditionalExpression)get5thParent(node), data, node);
+         }
+ 
+         return data;
+     }
+\ No newline at end of file
+",Buggy,"Fixed bug 1235300 - NullAssignment no longer flags assignments to final fields.
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@3672 51baf565-9d33-0410-a72c-fc3788e3496d"
+lucene-solr,11525.json,1b3b9294cc99985db88c2ef9074f05e802c6b55b,"@@ -1,8 +1,8 @@
+   public void collect(int doc) throws IOException {
+     delegate.collect(doc);
+-    lastDocId = doc;    
+     numCollected++;  
+-    if(numCollected==maxDocsToCollect) {
+-      throw new EarlyTerminatingCollectorException(numCollected, lastDocId);
++    if(maxDocsToCollect <= numCollected) {
++      throw new EarlyTerminatingCollectorException
++        (numCollected, prevReaderCumulativeSize + (doc + 1));
+     }
+   }
+\ No newline at end of file
+",Buggy,"SOLR-5122: Fixed bug in spellcheck.collateMaxCollectDocs.  Eliminates risk of divide by zero, and makes estimated hit counts meaningful in non-optimized indexes.
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1514402 13f79535-47bb-0310-9956-ffa450edef68
+"
+guava,17172.json,0330f712f56cc53633874e95bdc1203cf881eb85,"@@ -1,10 +1,10 @@
+     public V get(@Nullable Object key) {
+       if (key instanceof Range) {
+         Range<?> range = (Range<?>) key;
+         RangeMapEntry<K, V> rangeMapEntry = entriesByLowerBound.get(range.lowerBound);
+-        if (rangeMapEntry.getKey().equals(range)) {
++        if (rangeMapEntry != null && rangeMapEntry.getKey().equals(range)) {
+           return rangeMapEntry.getValue();
+         }
+       }
+       return null;
+     }
+\ No newline at end of file
+",Buggy,"Fix bug in TreeRangeMap.asMapOfRanges().get(absentRange)
+-------------
+Created by MOE: http://code.google.com/p/moe-java
+MOE_MIGRATED_REVID=38651843"
+lucene-solr,20864.json,568f6a398a8be76ec0261125f625c5d28942ea4a,"@@ -1,3 +1,3 @@
+-  public static ConfigSolr fromSolrHome(String solrHome) {
+-    return fromFile(new File(solrHome, SOLR_XML_FILE));
++  public static ConfigSolr fromSolrHome(SolrResourceLoader loader, String solrHome) {
++    return fromFile(loader, new File(solrHome, SOLR_XML_FILE));
+   }
+\ No newline at end of file
+",NotBuggy,"SOLR-5009: Don't create multiple SolrResourceLoaders for same Solr home, wasting resources and slowing down startup. This fixes the problem where the loader was not correctly closed, making tests fail on Windows.
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1500156 13f79535-47bb-0310-9956-ffa450edef68
+"
+ant,787.json,bb2695af1464b52cacdd3d3672e428358c3142dd,"@@ -1,29 +1,22 @@
+     public final int read() throws IOException {
+         if (!getInitialized()) {
+             initialize();
+             setInitialized(true);
+         }
+ 
+         int ch = -1;
+         if (unicodeBuf.length() == 0) {
+             ch = in.read();
+             if (ch != -1) {
+                 char achar = (char) ch;
+                 if (achar >= '\u0080') {
+-                    unicodeBuf = new StringBuffer(""u0000"");
+-                    String s = Integer.toHexString(ch);
+-                    //replace the last 0s by the chars contained in s
+-                    for (int i = 0; i < s.length(); i++) {
+-                        unicodeBuf.setCharAt(unicodeBuf.length()
+-                                             - s.length() + i,
+-                                             s.charAt(i));
+-                    }
++                    unicodeBuf = UnicodeUtil.EscapeUnicode(achar);
+                     ch = '\\';
+                 }
+             }
+         } else {
+             ch = (int) unicodeBuf.charAt(0);
+             unicodeBuf.deleteCharAt(0);
+         }
+         return ch;
+     }
+\ No newline at end of file
+",Buggy,"fix for bug 50515, incorrect unicode escapes in propertyfile task
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@1054711 13f79535-47bb-0310-9956-ffa450edef68
+"
+weka,20407.json,d5169a182f63b31a737d9b5d57ecdb49b8fbd56a,"@@ -1,4 +1,11 @@
+   public void setDB(boolean flag){
+   
+       m_dbSet = flag;
++      if (m_dbSet) {
++        try {
++          newStructure();
++        } catch (Exception e) {
++          e.printStackTrace();
++        }
++      }
+   }
+\ No newline at end of file
+",Buggy,"Fixed a bug where configuration changes (new files selected or database configuration changed) was not getting sent to downstream steps
+
+git-svn-id: https://svn.cms.waikato.ac.nz/svn/weka/trunk@7854 e0a1b77d-ad91-4216-81b1-defd5f83fa92
+"
+lucene-solr,41782.json,f5fdea8ddaa3002dc89e624e608582a6345f7e1d,"@@ -1,52 +1,60 @@
+   public void collect(int doc) throws IOException {
+ 
+     if (curDocs == null) {
+       // Cache was too large
+-      if (curScores != null) {
+-        score = scorer.score();
++      if (cacheScores) {
++        cachedScorer.score = scorer.score();
+       }
+-      this.doc = doc;
++      cachedScorer.doc = doc;
+       other.collect(doc);
+       return;
+     }
+ 
++    // Allocate a bigger array or abort caching
+     if (upto == curDocs.length) {
+       base += upto;
+-      final int nextLength;
+-      // Max out at 512K arrays:
+-      if (curDocs.length < 524288) {
+-        nextLength = 8*curDocs.length;
+-      } else {
+-        nextLength = curDocs.length;
++      
++      // Compute next array length - don't allocate too big arrays
++      int nextLength = 8*curDocs.length;
++      if (nextLength > MAX_ARRAY_SIZE) {
++        nextLength = MAX_ARRAY_SIZE;
+       }
+ 
+       if (base + nextLength > maxDocsToCache) {
+-        // Too many docs to collect -- clear cache
+-        curDocs = null;
+-        if (curScores != null) {
+-          score = scorer.score();
++        // try to allocate a smaller array
++        nextLength = maxDocsToCache - base;
++        if (nextLength <= 0) {
++          // Too many docs to collect -- clear cache
++          curDocs = null;
++          curScores = null;
++          cachedSegs.clear();
++          cachedDocs.clear();
++          cachedScores.clear();
++          if (cacheScores) {
++            cachedScorer.score = scorer.score();
++          }
++          cachedScorer.doc = doc;
++          other.collect(doc);
++          return;
+         }
+-        this.doc = doc;
+-        other.collect(doc);
+-        cachedDocs.clear();
+-        cachedScores.clear();
+-        return;
+       }
++      
+       curDocs = new int[nextLength];
+       cachedDocs.add(curDocs);
+-      if (curScores != null) {
++      if (cacheScores) {
+         curScores = new float[nextLength];
+         cachedScores.add(curScores);
+       }
+       upto = 0;
+     }
++    
+     curDocs[upto] = doc;
+     // TODO: maybe specialize private subclass so we don't
+     // null check per collect...
+-    if (curScores != null) {
+-      score = curScores[upto] = scorer.score();
++    if (cacheScores) {
++      cachedScorer.score = curScores[upto] = scorer.score();
+     }
+     upto++;
+-    this.doc = doc;
++    cachedScorer.doc = doc;
+     other.collect(doc);
+   }
+\ No newline at end of file
+",Buggy,"LUCENE-3102: first cut - some refactoring, bug fixes, add test, move to core (trunk)
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1103872 13f79535-47bb-0310-9956-ffa450edef68
+"
+guava,12247.json,0007cb257b593400097f37cf5fa9c8d5fb598c62,"@@ -1,7 +1,9 @@
+     SetBuilderImpl<E> review() {
+       int targetTableSize = chooseTableSize(distinct);
+       if (targetTableSize * 2 < hashTable.length) {
+         hashTable = rebuildHashTable(targetTableSize, dedupedElements, distinct);
++        maxRunBeforeFallback = maxRunBeforeFallback(targetTableSize);
++        expandTableThreshold = (int) (DESIRED_LOAD_FACTOR * targetTableSize);
+       }
+       return hashFloodingDetected(hashTable) ? new JdkBackedSetBuilderImpl<E>(this) : this;
+     }
+\ No newline at end of file
+",Buggy,"Fix #3570 by resetting expandTableThreshold and
+maxRunBeforeFallback after resizing the hashTable.
+
+Fixes #3571
+
+[]
+
+RELNOTES=Fixed a bug in `ImmutableSet.Builder` that could lead to infinite loops when building multiple sets from the same builder.
+
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=264648412"
+pmd,2689.json,e249deb0879da58e78f31eafbafc3992661b5142,"@@ -1,7 +1,7 @@
+     public int getLineCount(Mark mark, Match match) {
+         TokenEntry endTok = get(mark.getIndexIntoTokenArray() + match.getTokenCount());
+         if (endTok.equals(TokenEntry.EOF)) {
+             endTok = get(mark.getIndexIntoTokenArray() + match.getTokenCount() - 1);
+         }
+-        return endTok.getBeginLine() - mark.getBeginLine();
++        return endTok.getBeginLine() - mark.getBeginLine() - 1;
+     }
+\ No newline at end of file
+",Buggy,"Fixed bug in the 'source code slice' logic
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@1705 51baf565-9d33-0410-a72c-fc3788e3496d"
+guava,22246.json,c5231cfd14de78cd50099e095798fba6726cbe9e,"@@ -1,5 +1,4 @@
+   public static void serialize(SerializationStreamWriter writer, RegularImmutableAsList<?> instance)
+       throws SerializationException {
+-    writer.writeObject(instance.delegateCollection());
+-    writer.writeObject(instance.delegateList());
++    Collection_CustomFieldSerializerBase.serialize(writer, instance);
+   }
+\ No newline at end of file
+",Buggy,"fixes serialization errors when serializing a
+RegularImmutableAsList
+
+the issue occur when ImmutableList is included in gwt's serialization
+policy and ImmutableSet not and a list created by ImmutableSet.asList
+needs to be serialized
+
+Fixes #2614
+
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=137724815"
+hbase,1193.json,2beda62a10f0828eb10cec28b0ba53246cd0b671,"@@ -1,3 +1,3 @@
+     public Configuration getConfiguration() {
+-      return conf;
++      return getConf();
+     }
+\ No newline at end of file
+",Buggy,"HBASE-20083 Fix findbugs error for ReplicationSyncUp
+"
+guava,10943.json,3fbaf56f390db1a7c442ceaeab2c3a8bc1c8fd79,"@@ -1,29 +1,43 @@
+     @Override protected String computeNext() {
+       while (offset != -1) {
+         int start = offset;
+         int end;
+ 
+         int separatorPosition = separatorStart(offset);
+         if (separatorPosition == -1) {
+           end = toSplit.length();
+           offset = -1;
+         } else {
+           end = separatorPosition;
+           offset = separatorEnd(separatorPosition);
+         }
+ 
+         while (start < end && trimmer.matches(toSplit.charAt(start))) {
+           start++;
+         }
+         while (end > start && trimmer.matches(toSplit.charAt(end - 1))) {
+           end--;
+         }
+ 
+         if (omitEmptyStrings && start == end) {
+           continue;
+         }
+ 
++        if (limit == 1) {
++          // The limit has been reached, return the rest of the string as the
++          // final item.  This is tested after empty string removal so that
++          // empty strings do not count towards the limit.
++          end = toSplit.length();
++          offset = -1;
++          // Since we may have changed the end, we need to trim it again.
++          while (end > start && trimmer.matches(toSplit.charAt(end - 1))) {
++            end--;
++          }
++        } else {
++          limit--;
++        }
++
+         return toSplit.subSequence(start, end).toString();
+       }
+       return endOfData();
+     }
+\ No newline at end of file
+",Buggy,"Fixed bug/532.
+Add warnings to README.
+
+These should be the last changes for Guava release 08.
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=
+
+
+git-svn-id: https://guava-libraries.googlecode.com/svn/trunk@160 8138a162-5c33-11de-8abc-d1c337b90d21"
+guava,21154.json,1a5b0b9caaa5b6aaef77c9e7ace4f8cac4025738,"@@ -1,11 +1,8 @@
+     private void endTask() {
+-      lock.lock();
+-      try {
+-        runningTasks--;
+-        if (isTerminated()) {
+-          termination.signalAll();
++      synchronized (lock) {
++        int numRunning = --runningTasks;
++        if (numRunning == 0) {
++          lock.notifyAll();
+         }
+-      } finally {
+-        lock.unlock();
+       }
+     }
+\ No newline at end of file
+",Buggy,"Fix a signaling bug in newDirectExecutorService()  Also switch to implicit
+monitors to take advantage of biased locking.
+
+If thread A calls awaitTermination while there are no running tasks, then
+Thread B calls shutdown(). Thread A will never be woken up.
+-------------
+Created by MOE: http://code.google.com/p/moe-java
+MOE_MIGRATED_REVID=87280837"
+jna,2043.json,fe79ff84115369d6cc0e1d6fa240d2c431094af7,"@@ -1,3 +1,3 @@
+     public static boolean FAILED(int hr) {
+-        return (hr != S_OK);
++        return hr < 0;
+     }
+\ No newline at end of file
+",Buggy,"Fix SUCCEEDED and FAILED instead of trying to fix the bug where it's visible. See MSDN for FAILED and SUCCEEDED definitions
+
+Changes
+"
+pmd,8010.json,87bbe9e5b34ddf7a66a3d5b462991cbb47746d80,"@@ -1,11 +1,19 @@
+     public JavaTypeDefinition getGenericType(final String parameterName) {
+-        final TypeVariable<?>[] typeParameters = clazz.getTypeParameters();
+-        for (int i = 0; i < typeParameters.length; i++) {
+-            if (typeParameters[i].getName().equals(parameterName)) {
+-                return getGenericType(i);
++        for (JavaTypeDefinition currTypeDef = this; currTypeDef != null; currTypeDef = currTypeDef.enclosingClass) {
++            final TypeVariable<?>[] typeParameters = currTypeDef.clazz.getTypeParameters();
++            for (int i = 0; i < typeParameters.length; i++) {
++                if (typeParameters[i].getName().equals(parameterName)) {
++                    return currTypeDef.getGenericType(i);
++                }
+             }
+         }
+ 
+-        throw new IllegalArgumentException(""No generic parameter by name "" + parameterName
+-                                                   + "" on class "" + clazz.getSimpleName());
++        // throw because we could not find parameterName
++        StringBuilder builder = new StringBuilder(""No generic parameter by name "").append(parameterName);
++        for (JavaTypeDefinition currTypeDef = this; currTypeDef != null; currTypeDef = currTypeDef.enclosingClass) {
++            builder.append(""\n on class "");
++            builder.append(clazz.getSimpleName());
++        }
++
++        throw new IllegalArgumentException(builder.toString());
+     }
+\ No newline at end of file
+",Buggy,"Java, typedef: fix a bug with nested classes if the outter class is generic"
+ant,3769.json,2ca342fb2a9191f8e22abfc8fee9aaab94ea8496,"@@ -1,6 +1,6 @@
+     public void setServerLanguageCodeConfig(LanguageCode serverLanguageCode) {
+-        if (serverLanguageCode != null && !serverLanguageCode.equals("""")) {
++        if (serverLanguageCode != null && !"""".equals(serverLanguageCode.getValue())) {
+             this.serverLanguageCodeConfig = serverLanguageCode;
+             configurationHasBeenSet();
+         }
+     }
+\ No newline at end of file
+",Buggy,"Fixed some obvious errors. (Formatter class is not thread safe, equals from string to another object).
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@739572 13f79535-47bb-0310-9956-ffa450edef68
+"
+guava,11944.json,946ebccece2c45cce528cdc6d2db1aa31d2cfa73,"@@ -1,20 +1,26 @@
+   private Type resolveTypeArgsForSubclass(Class<?> subclass) {
+-    if (runtimeType instanceof Class) {
++    // If both runtimeType and subclass are not parameterized, return subclass
++    // If runtimeType is not parameterized but subclass is, process subclass as a parameterized type
++    // If runtimeType is a raw type (i.e. is a parameterized type specified as a Class<?>), we
++    // return subclass as a raw type
++    if (runtimeType instanceof Class
++        && ((subclass.getTypeParameters().length == 0)
++            || (getRawType().getTypeParameters().length != 0))) {
+       // no resolution needed
+       return subclass;
+     }
+     // class Base<A, B> {}
+     // class Sub<X, Y> extends Base<X, Y> {}
+     // Base<String, Integer>.subtype(Sub.class):
+ 
+     // Sub<X, Y>.getSupertype(Base.class) => Base<X, Y>
+     // => X=String, Y=Integer
+     // => Sub<X, Y>=Sub<String, Integer>
+     TypeToken<?> genericSubtype = toGenericType(subclass);
+     @SuppressWarnings({""rawtypes"", ""unchecked""}) // subclass isn't <? extends T>
+     Type supertypeWithArgsFromSubtype =
+         genericSubtype.getSupertype((Class) getRawType()).runtimeType;
+     return new TypeResolver()
+         .where(supertypeWithArgsFromSubtype, runtimeType)
+         .resolveType(genericSubtype.runtimeType);
+   }
+\ No newline at end of file
+",Buggy,"Currently, SomeClass<?>.getSubType(SubClass<?, OtherT>) returns SubClass<?, OtherT>.
+However, if we do NotGeneric.getSubtype(SubClass<OtherT>), we get SubClass as a raw type instead of
+SubClass<OtherT>.
+
+If we fix that bug, then as it turns out we weren't generating proper owners for static classes, so fix that too
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=119755147"
+ant,9260.json,f4f7024234069cab8a6853720a326d12065a2d8e,"@@ -1,3 +1,4 @@
+     public void close() throws IOException {
+         flush();
++        removeBuffer();
+     }
+\ No newline at end of file
+",Buggy,"Fixed problem which gave (on Windows) output such as:
+
+[java] First line of real output
+[java]
+[java] Second line of real output
+[java]
+
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@271563 13f79535-47bb-0310-9956-ffa450edef68
+"
+guava,15642.json,dd96b4930181fc70bd7c90beded3a272f251db35,"@@ -1,31 +1,30 @@
+     int crossOverUp(int index, E x) {
+       if (index == 0) {
+         queue[0] = x;
+         return 0;
+       }
+       int parentIndex = getParentIndex(index);
+       E parentElement = elementData(parentIndex);
+       if (parentIndex != 0) {
+-        // This is a guard for the case of the childless uncle. No checks are
+-        // performed for childlessness (even if we could check it), but since
+-        // it is the minimum sibling that is moved from ""max"" to ""min"" half
+-        // of the heap, and only if x is larger, and this is at the bottom
+-        // edge of the heap, the heap invariant is still preserved.
++        // This is a guard for the case of the childless uncle.
++        // Since the end of the array is actually the middle of the heap,
++        // a smaller childless uncle can become a child of x when we
++        // bubble up alternate levels, violating the invariant.
+         int grandparentIndex = getParentIndex(parentIndex);
+         int uncleIndex = getRightChildIndex(grandparentIndex);
+-        if (uncleIndex != parentIndex) {
++        if (uncleIndex != parentIndex && getLeftChildIndex(uncleIndex) >= size) {
+           E uncleElement = elementData(uncleIndex);
+           if (ordering.compare(uncleElement, parentElement) < 0) {
+             parentIndex = uncleIndex;
+             parentElement = uncleElement;
+           }
+         }
+       }
+       if (ordering.compare(parentElement, x) < 0) {
+         queue[index] = parentElement;
+         queue[parentIndex] = x;
+         return parentIndex;
+       }
+       queue[index] = x;
+       return index;
+     }
+\ No newline at end of file
+",Buggy,"Fix a second case of ""childless uncle"" bug causing heap corruption.
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1027
+
+
+git-svn-id: https://guava-libraries.googlecode.com/svn/trunk@275 8138a162-5c33-11de-8abc-d1c337b90d21"
+guava,12172.json,843f8d8fc37133e6870d5b2200838219a55eb83e,"@@ -1,3 +1,3 @@
+     @Override public int size() {
+-      return safeIntFactorial(inputList.size());
++      return IntMath.factorial(inputList.size());
+     }
+\ No newline at end of file
+",Buggy,"Nuke 85 lines of code in Collections2 by adopting common.math. Which apparently fixed a size calculation bug that wasn't found due to a bad test that thought C(34,14) > MAX_VALUE.  (?)
+
+Also snuck a call to IntMath.pow() into cartesianProduct.
+-------------
+Created by MOE: http://code.google.com/p/moe-java
+MOE_MIGRATED_REVID=28310475"
+guava,9470.json,2ee7f9da69308c56d5af71267e8b797cedaf31ba,"@@ -1,3 +1,5 @@
+   public boolean hasEdgeConnecting(N nodeU, N nodeV) {
+-    return !edgesConnecting(nodeU, nodeV).isEmpty();
++    checkNotNull(nodeU);
++    checkNotNull(nodeV);
++    return nodes().contains(nodeU) && successors(nodeU).contains(nodeV);
+   }
+\ No newline at end of file
+",Buggy,"AbstractNetwork: fix bug in AbstractNetwork.hasEdgeConnecting() causing it to throw if either endpoint was not in the graph.
+
+RELNOTES=Fix bug in AbstractNetwork.hasEdgeConnecting() causing it to throw if either endpoint was not in the graph.  Originally reported as GitHub issue #3721.
+
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=282846559"
+jna,2041.json,fe79ff84115369d6cc0e1d6fa240d2c431094af7,"@@ -1,6 +1,3 @@
+     public static boolean SUCCEEDED(int hr) {
+-        if (hr == S_OK)
+-            return true;
+-        else
+-            return false;
++        return hr >= 0;
+     }
+\ No newline at end of file
+",Buggy,"Fix SUCCEEDED and FAILED instead of trying to fix the bug where it's visible. See MSDN for FAILED and SUCCEEDED definitions
+
+Changes
+"
+ant,9255.json,f4f7024234069cab8a6853720a326d12065a2d8e,"@@ -1,4 +1,12 @@
+     private void resetBufferInfo() {    
+         Thread current = Thread.currentThread();
+-        buffers.remove(current);
++        BufferInfo bufferInfo = (BufferInfo)buffers.get(current);
++        try {
++            bufferInfo.buffer.close();
++        }
++        catch (IOException e) {
++            // Shouldn't happen
++        }
++        bufferInfo.buffer = new ByteArrayOutputStream();
++        bufferInfo.skip = false;
+     }
+\ No newline at end of file
+",Buggy,"Fixed problem which gave (on Windows) output such as:
+
+[java] First line of real output
+[java]
+[java] Second line of real output
+[java]
+
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@271563 13f79535-47bb-0310-9956-ffa450edef68
+"
+sonarqube,4469.json,0584dc8d5d5d82a2035763c34afba0e12cf6e8d0,"@@ -1,15 +1,15 @@
+   public void handle(Request wsRequest, Response wsResponse) throws Exception {
+     try (DbSession dbSession = dbClient.openSession(false)) {
+       WsTemplateRef templateRef = WsTemplateRef.fromRequest(wsRequest);
+       PermissionTemplateDto template = support.findTemplate(dbSession, templateRef);
+       checkGlobalAdmin(userSession, template.getOrganizationUuid());
+ 
+       PermissionQuery query = buildPermissionQuery(wsRequest);
+-      int total = dbClient.permissionTemplateDao().countGroupNamesByQueryAndTemplate(dbSession, query, template.getId());
++      int total = dbClient.permissionTemplateDao().countGroupNamesByQueryAndTemplate(dbSession, query, template.getOrganizationUuid(), template.getId());
+       Paging paging = Paging.forPageIndex(wsRequest.mandatoryParamAsInt(PAGE)).withPageSize(wsRequest.mandatoryParamAsInt(PAGE_SIZE)).andTotal(total);
+       List<GroupDto> groups = findGroups(dbSession, query, template);
+       List<PermissionTemplateGroupDto> groupPermissions = findGroupPermissions(dbSession, groups, template);
+       WsPermissions.WsGroupsResponse groupsResponse = buildResponse(groups, groupPermissions, paging);
+       writeProtobuf(groupsResponse, wsRequest, wsResponse);
+     }
+   }
+\ No newline at end of file
+",Buggy,"SONAR-8682 fix error when filtering on name
+
+and a given group name exists in multiple organizations
+"
+pmd,358.json,604a45d941cf2042c5c548490ef4401ad54080c9,"@@ -1,19 +1,31 @@
+     private void validate() throws BuildException {
+         // TODO - check for empty Formatters List here?
+         for (Formatter f: formatters) {
+             if (f.isNoOutputSupplied()) {
+                 throw new BuildException(""toFile or toConsole needs to be specified in Formatter"");
+             }
+         }
+ 
+         if (ruleSetFiles == null) {
+             if (nestedRules.isEmpty()) {
+                 throw new BuildException(""No rulesets specified"");
+             }
+             ruleSetFiles = getNestedRuleSetFiles();
+         }
+ 
++        // convert relative paths and substitute env variables/properties
++        final StringBuffer sb = new StringBuffer();
++        for(String s: ruleSetFiles.split("","")) {
++            Path p = new Path(getProject());
++            p.setPath(getProject().replaceProperties(s));
++            if (sb.length() > 0) {
++                sb.append(',');
++            }
++            sb.append(p);
++        }
++        ruleSetFiles = sb.toString();
++
+         if (!targetJDK.equals(""1.3"") && !targetJDK.equals(""1.4"") && !targetJDK.equals(""1.5"") && !targetJDK.equals(""1.6"") && !targetJDK.equals(""1.7"") && !targetJDK.equals(""jsp"")) {
+             throw new BuildException(""The targetjdk attribute, if used, must be set to either '1.3', '1.4', '1.5', '1.6', '1.7' or 'jsp'"");
+         }
+     }
+\ No newline at end of file
+",Buggy,"Fixed bug 1943204 - Ant task: <ruleset> path should be relative to Ant basedir
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@6441 51baf565-9d33-0410-a72c-fc3788e3496d"
+pmd,2946.json,4383ac357979bf353947351cac11d9586398ffbd,"@@ -1,4 +1,3 @@
+         public String toString() {
+-            SimpleNode n = (SimpleNode) node.jjtGetChild(1);
+-            return n.getImage();
++            return node.getMethodName();
+         }
+\ No newline at end of file
+",Buggy,"Fixed bug 1235300 - NullAssignment no longer flags assignments to final fields.
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@3672 51baf565-9d33-0410-a72c-fc3788e3496d"
+weka,11730.json,38a69e67c3d1f3dcb2e0c53e54f54b37ff25a090,"@@ -1,23 +1,37 @@
+ 	private void panelChanged() {
+ 		int numTab = viewerTabbedPanel.getSelectedIndex();
+ 		visu1Rules = selectionPanel.getSelectedRules(1);
+ /*		visu2Rules = selectionPanel.getSelectedRules(2);
+ 		visu3Rules = selectionPanel.getSelectedRules(3); */
+ 
+ 		switch (numTab) {
++		case 0:
++			visu1PanelHolder.removeAll();
++			visu1PanelHolder.revalidate();
++			visu1PanelHolder.repaint();
++			break;
+ 			case 1 :
++				visu1PanelHolder.add(visu1Panel3D, BorderLayout.CENTER);
++				revalidate();
++				repaint();
+ 				String[] selectedCriteria =
+ 					selectionPanel.getSelectedCriteria();
+ 				visu1Panel3D.setData(visu1Rules, selectedCriteria);
+ //				visu1Panel.setSelectedRules(visu2Rules);
+ 				break;
+ 			case 2 :
+ 				visu2Panel.setData(visu2Rules, criteres);
+ 				visu2Panel.setSelectedRules(visu3Rules);
++				visu1PanelHolder.removeAll();
++				visu1PanelHolder.revalidate();
++				visu1PanelHolder.repaint();
+ 				break;
+ 			case 3 :
+ 				visu3Panel.setData(visu3Rules);
++				visu1PanelHolder.removeAll();
++				visu1PanelHolder.revalidate();
++				visu1PanelHolder.repaint();
+ 				break;
+ 		}
+ 
+ 	}
+\ No newline at end of file
+",Buggy,"Fixed a refresh bug that prevented the switching back to the rules selection tab from the 3D viewer tab. Now depends on the scatterPlot3D package for the Java3D libraries
+
+git-svn-id: https://svn.cms.waikato.ac.nz/svn/weka/trunk@12305 e0a1b77d-ad91-4216-81b1-defd5f83fa92
+"
+guava,21153.json,1a5b0b9caaa5b6aaef77c9e7ace4f8cac4025738,"@@ -1,11 +1,8 @@
+     private void startTask() {
+-      lock.lock();
+-      try {
+-        if (isShutdown()) {
++      synchronized (lock) {
++        if (shutdown) {
+           throw new RejectedExecutionException(""Executor already shutdown"");
+         }
+         runningTasks++;
+-      } finally {
+-        lock.unlock();
+       }
+     }
+\ No newline at end of file
+",Buggy,"Fix a signaling bug in newDirectExecutorService()  Also switch to implicit
+monitors to take advantage of biased locking.
+
+If thread A calls awaitTermination while there are no running tasks, then
+Thread B calls shutdown(). Thread A will never be woken up.
+-------------
+Created by MOE: http://code.google.com/p/moe-java
+MOE_MIGRATED_REVID=87280837"
+voldemort,7092.json,e7ecec1bd3dd879221a56714fc774a2001d843e8,"@@ -1,122 +1,150 @@
+     public void rebalanceStateChange(Cluster cluster,
+                                      List<RebalancePartitionsInfo> rebalancePartitionsInfo,
+                                      boolean swapRO,
+                                      boolean changeClusterMetadata,
+                                      boolean changeRebalanceState,
+                                      boolean rollback) {
+         Cluster currentCluster = metadataStore.getCluster();
+ 
+         logger.info(""Server doing rebalance state change with options [ cluster metadata change - ""
+                     + changeClusterMetadata + "" ], [ changing rebalancing state - ""
+                     + changeRebalanceState + "" ], [ changing swapping RO - "" + swapRO
+                     + "" ], [ rollback - "" + rollback + "" ]"");
+ 
+         // Variables to track what has completed
+         List<RebalancePartitionsInfo> completedRebalancePartitionsInfo = Lists.newArrayList();
+         List<String> swappedStoreNames = Lists.newArrayList();
+         boolean completedClusterChange = false;
+         boolean completedRebalanceSourceClusterChange = false;
+         Cluster previousRebalancingSourceCluster = null;
+ 
+         try {
+-            // CHANGE CLUSTER METADATA
+-            if(changeClusterMetadata) {
+-                logger.info(""Switching metadata from "" + currentCluster + "" to "" + cluster);
+-                changeCluster(MetadataStore.CLUSTER_KEY, cluster);
+-                completedClusterChange = true;
+-            }
+ 
+-            // SWAP RO DATA FOR ALL STORES
+-            if(swapRO) {
+-                swapROStores(swappedStoreNames, false);
+-            }
+-
++            /*
++             * Do the rebalancing state changes. It is important that this
++             * happens before the actual cluster metadata is changed. Here's
++             * what could happen otherwise. When a batch completes with
++             * {current_cluster c2, rebalancing_source_cluster c1} and the next
++             * rebalancing state changes it to {current_cluster c3,
++             * rebalancing_source_cluster c2} is set for the next batch, then
++             * there could be a window during which the state is
++             * {current_cluster c3, rebalancing_source_cluster c1}. On the other
++             * hand, when we update the rebalancing source cluster first, there
++             * is a window where the state is {current_cluster c2,
++             * rebalancing_source_cluster c2}, which still fine, because of the
++             * following. Successful completion of a batch means the cluster is
++             * finalized, so its okay to stop proxying based on {current_cluster
++             * c2, rebalancing_source_cluster c1}. And since the cluster
++             * metadata has not yet been updated to c3, the writes will happen
++             * based on c2.
++             * 
++             * Even if some clients have already seen the {current_cluster c3,
++             * rebalancing_source_cluster c2} state from other servers, the
++             * operation will be rejected with InvalidMetadataException since
++             * this server itself is not aware of C3
++             */
+             // CHANGE REBALANCING STATE
+             if(changeRebalanceState) {
+                 try {
+                     previousRebalancingSourceCluster = metadataStore.getRebalancingSourceCluster();
+                     if(!rollback) {
+                         // Save up the current cluster for Redirecting store
++                        logger.info(""Setting rebalancing source cluster xml from ""
++                                    + previousRebalancingSourceCluster + ""to "" + currentCluster);
+                         changeCluster(MetadataStore.REBALANCING_SOURCE_CLUSTER_XML, currentCluster);
+                         completedRebalanceSourceClusterChange = true;
+ 
+                         for(RebalancePartitionsInfo info: rebalancePartitionsInfo) {
+                             metadataStore.addRebalancingState(info);
+                             completedRebalancePartitionsInfo.add(info);
+                         }
+                     } else {
+                         // Reset the rebalancing source cluster back to null
++                        logger.info(""Resetting rebalancing source cluster xml from ""
++                                    + previousRebalancingSourceCluster + ""to null"");
+                         changeCluster(MetadataStore.REBALANCING_SOURCE_CLUSTER_XML, null);
+                         completedRebalanceSourceClusterChange = true;
+ 
+                         for(RebalancePartitionsInfo info: rebalancePartitionsInfo) {
+                             metadataStore.deleteRebalancingState(info);
+                             completedRebalancePartitionsInfo.add(info);
+                         }
+                     }
+                 } catch(Exception e) {
+                     throw new VoldemortException(e);
+                 }
+             }
++
++            // CHANGE CLUSTER METADATA
++            if(changeClusterMetadata) {
++                logger.info(""Switching metadata from "" + currentCluster + "" to "" + cluster);
++                changeCluster(MetadataStore.CLUSTER_KEY, cluster);
++                completedClusterChange = true;
++            }
++
++            // SWAP RO DATA FOR ALL STORES
++            if(swapRO) {
++                swapROStores(swappedStoreNames, false);
++            }
+         } catch(VoldemortException e) {
+ 
+             logger.error(""Got exception while changing state, now rolling back changes"", e);
+ 
+             // ROLLBACK CLUSTER CHANGE
+             if(completedClusterChange) {
+                 try {
+                     logger.info(""Rolling back cluster.xml to "" + currentCluster);
+                     changeCluster(MetadataStore.CLUSTER_KEY, currentCluster);
+                 } catch(Exception exception) {
+                     logger.error(""Error while rolling back cluster metadata to "" + currentCluster,
+                                  exception);
+                 }
+             }
+ 
+             // SWAP RO DATA FOR ALL COMPLETED STORES
+             if(swappedStoreNames.size() > 0) {
+                 try {
+                     swapROStores(swappedStoreNames, true);
+                 } catch(Exception exception) {
+                     logger.error(""Error while swapping back to old state "", exception);
+                 }
+             }
+ 
+             // CHANGE BACK ALL REBALANCING STATES FOR COMPLETED ONES
+             if(completedRebalancePartitionsInfo.size() > 0) {
+                 if(!rollback) {
+                     for(RebalancePartitionsInfo info: completedRebalancePartitionsInfo) {
+                         try {
+                             metadataStore.deleteRebalancingState(info);
+                         } catch(Exception exception) {
+                             logger.error(""Error while deleting back rebalance info during error rollback ""
+                                                  + info,
+                                          exception);
+                         }
+                     }
+                 } else {
+                     for(RebalancePartitionsInfo info: completedRebalancePartitionsInfo) {
+                         try {
+                             metadataStore.addRebalancingState(info);
+                         } catch(Exception exception) {
+                             logger.error(""Error while adding back rebalance info during error rollback ""
+                                                  + info,
+                                          exception);
+                         }
+                     }
+                 }
+ 
+             }
+ 
+             // Revert changes to REBALANCING_SOURCE_CLUSTER_XML
+             if(completedRebalanceSourceClusterChange) {
+                 logger.info(""Reverting the REBALANCING_SOURCE_CLUSTER_XML back to ""
+                             + previousRebalancingSourceCluster);
+                 changeCluster(MetadataStore.REBALANCING_SOURCE_CLUSTER_XML,
+                               previousRebalancingSourceCluster);
+             }
+ 
+             throw e;
+         }
+ 
+     }
+\ No newline at end of file
+",Buggy,"1.Enabling proxy puts by dafault
+2. Bug fix in proxy put stats
+3. Changing order of state change updates for correctness
+4. Setting proxy put tests to do one batch rebalancing
+"
+lucene-solr,13439.json,cc344dc6bd9e71ed7848618630b51f4633e1dd50,"@@ -1,8 +1,3 @@
+     public Object getValue(int slot) {
+-      long val = result[slot];
+-      if (val == 0 && exists.get(slot)) {
+-        return null;
+-      } else {
+-        return val;
+-      }
++      return result[slot] == MISSING ? null : new Date(result[slot]);
+     }
+\ No newline at end of file
+",Buggy,"SOLR-11316: date support for min/max, fix missing bug for int/long fields
+"
+ant,4305.json,faedd2bc5b9fdcaa0650966bc7fef43c5c59cf9a,"@@ -1,87 +1,89 @@
+         private URLConnection openConnection(final URL aSource) throws IOException {
+ 
+             // set up the URL connection
+             final URLConnection connection = aSource.openConnection();
+             // modify the headers
+             // NB: things like user authentication could go in here too.
+             if (hasTimestamp) {
+                 connection.setIfModifiedSince(timestamp);
+             }
+             // Set the user agent
+             connection.addRequestProperty(""User-Agent"", this.userAgent);
+ 
+             // prepare Java 1.1 style credentials
+             if (uname != null || pword != null) {
+                 final String up = uname + "":"" + pword;
+                 String encoding;
+                 // we do not use the sun impl for portability,
+                 // and always use our own implementation for consistent
+                 // testing
+                 final Base64Converter encoder = new Base64Converter();
+                 encoding = encoder.encode(up.getBytes());
+                 connection.setRequestProperty(""Authorization"", ""Basic ""
+                         + encoding);
+             }
+ 
+-            connection.setRequestProperty(""Accept-Encoding"", GZIP_CONTENT_ENCODING);
++            if (tryGzipEncoding) {
++                connection.setRequestProperty(""Accept-Encoding"", GZIP_CONTENT_ENCODING);
++            }
+ 
+             if (connection instanceof HttpURLConnection) {
+                 ((HttpURLConnection) connection)
+                         .setInstanceFollowRedirects(false);
+                 ((HttpURLConnection) connection)
+                         .setUseCaches(httpUseCaches);
+             }
+             // connect to the remote site (may take some time)
+             try {
+                 connection.connect();
+             } catch (final NullPointerException e) {
+                 //bad URLs can trigger NPEs in some JVMs
+                 throw new BuildException(""Failed to parse "" + source.toString(), e);
+             }
+ 
+             // First check on a 301 / 302 (moved) response (HTTP only)
+             if (connection instanceof HttpURLConnection) {
+                 final HttpURLConnection httpConnection = (HttpURLConnection) connection;
+                 final int responseCode = httpConnection.getResponseCode();
+                 if (isMoved(responseCode)) {
+                     final String newLocation = httpConnection.getHeaderField(""Location"");
+                     final String message = aSource
+                             + (responseCode == HttpURLConnection.HTTP_MOVED_PERM ? "" permanently""
+                                     : """") + "" moved to "" + newLocation;
+                     log(message, logLevel);
+                     final URL newURL = new URL(aSource, newLocation);
+                     if (!redirectionAllowed(aSource, newURL)) {
+                         return null;
+                     }
+                     return openConnection(newURL);
+                 }
+                 // next test for a 304 result (HTTP only)
+                 final long lastModified = httpConnection.getLastModified();
+                 if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED
+                         || (lastModified != 0 && hasTimestamp && timestamp >= lastModified)) {
+                     // not modified so no file download. just return
+                     // instead and trace out something so the user
+                     // doesn't think that the download happened when it
+                     // didn't
+                     log(""Not modified - so not downloaded"", logLevel);
+                     return null;
+                 }
+                 // test for 401 result (HTTP only)
+                 if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                     final String message = ""HTTP Authorization failure"";
+                     if (ignoreErrors) {
+                         log(message, logLevel);
+                         return null;
+                     } else {
+                         throw new BuildException(message);
+                     }
+                 }
+             }
+ 
+             //REVISIT: at this point even non HTTP connections may
+             //support the if-modified-since behaviour -we just check
+             //the date of the content and skip the write if it is not
+             //newer. Some protocols (FTP) don't include dates, of
+             //course.
+             return connection;
+         }
+\ No newline at end of file
+",Buggy,"only enable transparent gzip encoding when explicitly specified
+fixes bugzilla issue 57048
+"
+weka,24356.json,0613647d320672d37f6da68efd32bd14bb88435b,"@@ -1,5 +1,6 @@
+   public void setResultProducer(ResultProducer newResultProducer) {
+-    
++
+     m_ResultProducer = newResultProducer;
++    m_ResultProducer.setResultListener(this);
+     findKeyIndex();
+   }
+\ No newline at end of file
+",Buggy,"- Fixed bug where sometimes the sub-ResultProducer would not be correctly
+connected.
+
+
+git-svn-id: https://svn.cms.waikato.ac.nz/svn/weka/trunk@171 e0a1b77d-ad91-4216-81b1-defd5f83fa92
+"
+spring-boot,510.json,99ae6dac5321a741d93ff5187fafb94c295a6928,"@@ -1,3 +1,3 @@
+-		public CouchbaseEnvironment couchbaseEnvironment() throws Exception {
+-			return createEnvironment(this.properties);
++		public DefaultCouchbaseEnvironment couchbaseEnvironment() throws Exception {
++			return initializeEnvironmentBuilder(this.properties).build();
+ 		}
+\ No newline at end of file
+",Buggy,"Customize Couchbase's socket connect timeout
+
+Our Windows build is failing currently because the couchbase server does
+not handle a socket connection within a second (the default). This commit
+adds a property to customize this option and set it to 10 sec in the
+sample.
+
+While investigating this issue, it turns out that while
+`CouchbaseConfiguration` is public, it is not really possible to extend
+it in user's configuration. This commit fixes this problem and add a test
+that demonstrates how it can be used.
+
+Closes gh-5657"
+lucene-solr,49563.json,e48f99c36cb1a5a2cca505266f886fa52fd2be5f,"@@ -1,8 +1,8 @@
+   public static ReaderIterator getReaderIterator(DataInput in, int mem) throws IOException {
+-    final int version = CodecUtil.checkHeader(in, CODEC_NAME, VERSION_START, VERSION_START);
++    final int version = CodecUtil.checkHeader(in, CODEC_NAME, VERSION_START, VERSION_CURRENT);
+     final int bitsPerValue = in.readVInt();
+     assert bitsPerValue > 0 && bitsPerValue <= 64: ""bitsPerValue="" + bitsPerValue;
+     final int valueCount = in.readVInt();
+     final Format format = Format.byId(in.readVInt());
+     return getReaderIteratorNoHeader(in, format, version, valueCount, bitsPerValue, mem);
+   }
+\ No newline at end of file
+",Buggy,"Fix error-prone header check.
+
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1359861 13f79535-47bb-0310-9956-ffa450edef68
+"
+lucene-solr,30452.json,ef8126e5eab7aec9c8775c2e08bd6c2bb1ef690f,"@@ -1,13 +1,10 @@
+   public void setRangeValues(InetAddress min, InetAddress max) {
+-    if (StringHelper.compare(BYTES, min.getAddress(), 0, max.getAddress(), 0) > 0) {
+-      throw new IllegalArgumentException(""min value cannot be greater than max value for range field (name="" + name + "")"");
+-    }
+     final byte[] bytes;
+     if (fieldsData == null) {
+       bytes = new byte[BYTES*2];
+       fieldsData = new BytesRef(bytes);
+     } else {
+       bytes = ((BytesRef)fieldsData).bytes;
+     }
+     encode(min, max, bytes);
+   }
+\ No newline at end of file
+",Buggy,"LUCENE-7738: Fix min/max verification bug in InetAddressRange to correctly compare IPv4 and IPv6. Update tests.
+"
+hbase,36406.json,aeffca497bf36ea12f89a5f92d2f918b010741fc,"@@ -1,6 +1,6 @@
+   public void writeTo(Object object, Class<?> type, Type genericType,
+       Annotation[] annotations, MediaType mediaType,
+       MultivaluedMap<String, Object> httpHeaders, OutputStream outStream)
+       throws IOException, WebApplicationException {
+-    outStream.write(object.toString().getBytes());
++    outStream.write(Bytes.toBytes(object.toString()));
+   }
+\ No newline at end of file
+",Buggy,"HBASE-19846 Fix findbugs and error-prone warnings in hbase-rest (branch-2)
+
+Signed-off-by: tedyu <yuzhihong@gmail.com>
+"
+spring-framework,16453.json,67a06f5edcc8697af0941e238ef29bdb2a73245d,"@@ -1,8 +1,7 @@
+ 	public static ExchangeFilterFunction limitResponseSize(long maxByteCount) {
+ 		return (request, next) ->
+-				next.exchange(request).map(response -> {
+-					Flux<DataBuffer> body = response.body(BodyExtractors.toDataBuffers());
+-					body = DataBufferUtils.takeUntilByteCount(body, maxByteCount);
+-					return ClientResponse.from(response).body(body).build();
+-				});
++				next.exchange(request).map(response ->
++						response.mutate()
++								.body(body -> DataBufferUtils.takeUntilByteCount(body, maxByteCount))
++								.build());
+ 	}
+\ No newline at end of file
+",Buggy,"Add mutate() to ClientResponse and deprecate from()
+
+from() has the flaw of ignoring the body and it can't be fixed because
+applications are guaranteed to be setting it already and if set twice
+the builder drains the first body.
+
+mutate() is a better fit in any case for what needs to be done in a
+filter chain. It can be done more efficiently and is consistent with
+similar options on the server side.
+
+See gh-24680
+"
+pmd,376.json,a3d5e7e1921e2c1c10f6a1e60fdfc19983732097,"@@ -1,3 +1,3 @@
+     public void setClasspathRef(Reference r) {
+-        createClasspath().setRefid(r);
++        createLongClasspath().setRefid(r);
+     }
+\ No newline at end of file
+",Buggy,"Fixed nested classpath bug
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@1901 51baf565-9d33-0410-a72c-fc3788e3496d"
+guava,15653.json,2ef955163b3d43e7849c1929ef4e5d714b93da96,"@@ -1,21 +1,23 @@
+     public void remove() {
+       checkRemove(canRemove);
+       checkModCount();
+       canRemove = false;
+       expectedModCount++;
+       if (cursor < size()) {
+         MoveDesc<E> moved = removeAt(cursor);
+         if (moved != null) {
+           if (forgetMeNot == null) {
+             forgetMeNot = new ArrayDeque<E>();
+             skipMe = new ArrayList<E>(3);
+           }
+-          forgetMeNot.add(moved.toTrickle);
++          if (!containsExact(skipMe, moved.toTrickle)) {
++            forgetMeNot.add(moved.toTrickle);
++          }
+           skipMe.add(moved.replaced);
+         }
+         cursor--;
+       } else { // we must have set lastFromForgetMeNot in next()
+         checkState(removeExact(lastFromForgetMeNot));
+         lastFromForgetMeNot = null;
+       }
+     }
+\ No newline at end of file
+",Buggy,"Fix two bugs in MinMaxPriorityQueue (introduced in [] First is a bug in removeAt(int) that sometimes causes the wrong element to be removed. Second is a bug that sometimes causes certain elements to be iterated over more than once if elements were removed during iteration.
+
+Reported externally at https://github.com/google/guava/issues/2658
+
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=140382230"
+voldemort,887.json,81f0a160898ca88338ebf4834f7f1fd07f66c63b,"@@ -1,3 +1,3 @@
+         public String waitForCompletion(int nodeId, int requestId) {
+-            return waitForCompletion(nodeId, requestId, Long.MAX_VALUE, TimeUnit.SECONDS, null);
++            return waitForCompletion(nodeId, requestId, 0, TimeUnit.SECONDS, null);
+         }
+\ No newline at end of file
+",Buggy,"Fix some bugs I introduced and added more TODOs
+
+Fixed overflow introduced in AdminClient.waitForCompletion by passing in
+Long.MAX_VALUE for duration.
+
+Verify cluster store definition in StoreRoutingPlan. This requires
+working around existing problems with how system stores are handled (the
+store definition is hard-coded for two zones). Left some TODOs about
+testing and fixing all of this.
+
+Added TODOs about currentCluster vs interimCluster. Need to tweak
+interface to RebalanceController and RebalancePlan to be consistent with
+recommended usage (i.e., deploying interimCluster before starting
+rebalance).
+
+Minor tweaks to tests based on above changes.
+"
+ant,4816.json,29fface4fb93fb33b33c86124a168c04779271c0,"@@ -1,24 +1,24 @@
+     public boolean execute() throws BuildException {
+         Rmic owner = getRmic();
+         Commandline cmd = setupRmicCommand();
+         Project project = owner.getProject();
+         //rely on RMIC being on the path
+-        cmd.setExecutable(JavaEnvUtils.getJdkExecutable(SunRmic.RMIC_EXECUTABLE));
++        cmd.setExecutable(JavaEnvUtils.getJdkExecutable(getExecutableName()));
+ 
+         //set up the args
+         String[] args = cmd.getCommandline();
+ 
+         try {
+             Execute exe = new Execute(new LogStreamHandler(owner,
+                     Project.MSG_INFO,
+                     Project.MSG_WARN));
+             exe.setAntRun(project);
+             exe.setWorkingDirectory(project.getBaseDir());
+             exe.setCommandline(args);
+             exe.execute();
+             return !exe.isFailure();
+         } catch (IOException exception) {
+-            throw new BuildException(""Error running "" + SunRmic.RMIC_EXECUTABLE
++            throw new BuildException(""Error running "" + getExecutableName()
+                     + "" -maybe it is not on the path"", exception);
+         }
+     }
+\ No newline at end of file
+",Buggy,"bug ID#38732 , rmic task doesn't work with -Xnew and JDK 6.0
+
+Fixed by writing a new adapter, xnew, that extends the forking adapter and sets the -Xnew argument. Tests supplied, though the old test, the one that would fail on java1.6, is still there.
+
+Also made the name matching code of rmic locale-independent.
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@434029 13f79535-47bb-0310-9956-ffa450edef68
+"
+lucene-solr,14569.json,8bd7e5c9d254c1d629a784e0b601885adea2f57b,"@@ -1,30 +1,31 @@
+   public DocTransformer create(String display, SolrParams params, SolrQueryRequest req) {
+     String field = params.get(""f"");
+     if(Strings.isNullOrEmpty(field)) {
+       field = display;
+     }
+     // When a 'wt' is specified in the transformer, only apply it to the same wt
+     boolean apply = true;
+     if(applyToWT!=null) {
+       String qwt = req.getParams().get(CommonParams.WT);
+       if(qwt==null) {
+         QueryResponseWriter qw = req.getCore().getQueryResponseWriter(req);
+         QueryResponseWriter dw = req.getCore().getQueryResponseWriter(applyToWT);
+         if(qw!=dw) {
+           apply = false;
+         }
+       }
+       else {
+         apply = applyToWT.equals(qwt);
+       }
+     }
+ 
+     if(apply) {
+       return new RawTransformer( field, display );
+     }
+     
+-    if(field.equals(display)) {
+-      return null; // nothing
++    if (field.equals(display)) {
++      // we have to ensure the field is returned
++      return new NoopFieldTransformer(field);
+     }
+     return new RenameFieldTransformer( field, display, false );
+   }
+\ No newline at end of file
+",Buggy,"SOLR-11891: DocStreamer now respects the ReturnFields when populating a SolrDocument
+This is an optimization that reduces the number of unneccessary fields a ResponseWriter will see if documentCache is used
+
+This commit also includes fixes for SOLR-12107 & SOLR-12108 -- two bugs that were previously dependent on the
+un-optimized behavior of DocStreamer in order to function properly.
+
+- SOLR-12107: Fixed a error in [child] transformer that could ocur if documentCache was not used
+- SOLR-12108: Fixed the fallback behavior of [raw] and [xml] transformers when an incompatble 'wt' was specified,
+  the field value was lost if documentCache was not used.
+"
+ant,1828.json,85f6ea3795fa8d4393723ec229e9168f8b824f28,"@@ -1,11 +1,22 @@
+     public void execute() throws BuildException {
++        ScriptRunner runner = new ScriptRunner();
++        if (language != null) {
++            runner.setLanguage(language);
++        }
++        if (src != null) {
++            runner.setSrc(src);
++        }
++        if (text != null) {
++            runner.addText(text);
++        }
++        
+         runner.addBeans(getProject().getProperties());
+         runner.addBeans(getProject().getUserProperties());
+         runner.addBeans(getProject().getTargets());
+         runner.addBeans(getProject().getReferences());
+ 
+         runner.addBean(""project"", getProject());
+         runner.addBean(""self"", this);
+ 
+         runner.executeScript(""<ANT>"");
+     }
+\ No newline at end of file
+",Buggy,"Fix for script memory retaining problem.
+PR: 25394
+Obtained from: Jose Alberto Fernandez /  Antoine Levy-Lambert
+
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@275836 13f79535-47bb-0310-9956-ffa450edef68
+"
+pmd,8886.json,a405d23dfb9e574e2b2ef23f1f45d548a738ed3b,"@@ -1,18 +1,18 @@
+     public Object visit(ASTUnmodifiedClassDeclaration node, Object data) {
+         Map vars = node.getScope().getVariableDeclarations();
+         for (Iterator i = vars.keySet().iterator(); i.hasNext();) {
+             VariableNameDeclaration decl = (VariableNameDeclaration) i.next();
+-            if (!decl.getAccessNodeParent().isPrivate() || decl.getAccessNodeParent().isFinal()) {
++            if (decl.getAccessNodeParent().isStatic() || !decl.getAccessNodeParent().isPrivate() || decl.getAccessNodeParent().isFinal()) {
+                 continue;
+             }
++
+             int result = initializedInConstructor((List)vars.get(decl));
+             if (result == MUTABLE) {
+             	continue;
+             }
+-            if ((result == IMMUTABLE) ||
+-                ((result == CHECKDECL) && initializedInDeclaration(decl.getAccessNodeParent()))) {
++            if (result == IMMUTABLE || ((result == CHECKDECL) && initializedInDeclaration(decl.getAccessNodeParent()))) {
+                 ((RuleContext) data).getReport().addRuleViolation(createRuleViolation((RuleContext) data, decl.getLine(), MessageFormat.format(getMessage(), new Object[]{decl.getImage()})));
+             }
+         }
+         return super.visit(node, data);
+     }
+\ No newline at end of file
+",Buggy,"Fixed bug 1050173 - ImmutableFieldRule no longer reports false positives for static fields.  Also fixed version number in PMD.java, argh.
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@2994 51baf565-9d33-0410-a72c-fc3788e3496d"
+lucene-solr,41774.json,f5fdea8ddaa3002dc89e624e608582a6345f7e1d,"@@ -1,40 +1,42 @@
+   public void replay(Collector other) throws IOException {
+     if (!isCached()) {
+       throw new IllegalStateException(""cannot replay: cache was cleared because too much RAM was required"");
+     }
++    
++    if (!other.acceptsDocsOutOfOrder() && this.other.acceptsDocsOutOfOrder()) {
++      throw new IllegalArgumentException(
++          ""cannot replay: given collector does not support ""
++              + ""out-of-order collection, while the wrapped collector does. ""
++              + ""Therefore cached documents may be out-of-order."");
++    }
++
+     //System.out.println(""CC: replay totHits="" + (upto + base));
+     if (lastReaderContext != null) {
+       cachedSegs.add(new SegStart(lastReaderContext, base+upto));
+       lastReaderContext = null;
+     }
+-    final int uptoSav = upto;
+-    final int baseSav = base;
+-    try {
+-      upto = 0;
+-      base = 0;
+-      int chunkUpto = 0;
+-      other.setScorer(cachedScorer);
+-      curDocs = EMPTY_INT_ARRAY;
+-      for(SegStart seg : cachedSegs) {
+-        other.setNextReader(seg.readerContext);
+-        while(base+upto < seg.end) {
+-          if (upto == curDocs.length) {
+-            base += curDocs.length;
+-            curDocs = cachedDocs.get(chunkUpto);
+-            if (curScores != null) {
+-              curScores = cachedScores.get(chunkUpto);
+-            }
+-            chunkUpto++;
+-            upto = 0;
++    
++    int curupto = 0;
++    int curbase = 0;
++    int chunkUpto = 0;
++    other.setScorer(cachedScorer);
++    curDocs = EMPTY_INT_ARRAY;
++    for(SegStart seg : cachedSegs) {
++      other.setNextReader(seg.readerContext);
++      while(curbase+curupto < seg.end) {
++        if (curupto == curDocs.length) {
++          curbase += curDocs.length;
++          curDocs = cachedDocs.get(chunkUpto);
++          if (cacheScores) {
++            curScores = cachedScores.get(chunkUpto);
+           }
+-          if (curScores != null) {
+-            score = curScores[upto];
+-          }
+-          other.collect(curDocs[upto++]);
++          chunkUpto++;
++          curupto = 0;
+         }
++        if (cacheScores) {
++          cachedScorer.score = curScores[curupto];
++        }
++        other.collect(curDocs[curupto++]);
+       }
+-    } finally {
+-      upto = uptoSav;
+-      base = baseSav;
+     }
+   }
+\ No newline at end of file
+",Buggy,"LUCENE-3102: first cut - some refactoring, bug fixes, add test, move to core (trunk)
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1103872 13f79535-47bb-0310-9956-ffa450edef68
+"
+guava,10179.json,c0c117a04ab47f2fb380311efec97a7d9851cd6e,"@@ -1,11 +1,11 @@
+   protected String pendingToString() {
+     Object localValue = value;
+     if (localValue instanceof SetFuture) {
+-      return ""setFuture=["" + ((SetFuture) localValue).future + ""]"";
++      return ""setFuture=["" + userObjectToString(((SetFuture) localValue).future) + ""]"";
+     } else if (this instanceof ScheduledFuture) {
+       return ""remaining delay=[""
+           + ((ScheduledFuture) this).getDelay(TimeUnit.MILLISECONDS)
+           + "" ms]"";
+     }
+     return null;
+   }
+\ No newline at end of file
+",Buggy,"Fix some simple cases of stack overflow in AbstractFuture.toString()
+
+This is a partial fix for people doing weird things and can easily be circumvented by people adding some indirection, but this is also what AbstractCollection.toString does so it seems like there is a decent precedent for a partial solution to this problem.
+
+It doesn't appear to be possible to implement a full fix without resorting to things like threadlocals or examining the callstack, and this problem doesn't seem important enough to justify a solution like that.
+
+RELNOTES=n/a
+
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=181325137"
+ant,5442.json,7ee236d89f0e870cebb3ad9128de6b27689bea28,"@@ -1,116 +1,115 @@
+     public void execute() throws BuildException {
+         if (usedMatchingTask) {
+             log(""DEPRECATED - Use of the implicit FileSet is deprecated.  ""
+-                + ""Use a nested fileset element instead."");
++                + ""Use a nested fileset element instead."", quiet ? Project.MSG_VERBOSE : verbosity);
+         }
+ 
+         if (file == null && dir == null && filesets.size() == 0 && rcs == null) {
+             throw new BuildException(""At least one of the file or dir ""
+                                      + ""attributes, or a nested resource collection, ""
+                                      + ""must be set."");
+         }
+ 
+         if (quiet && failonerror) {
+             throw new BuildException(""quiet and failonerror cannot both be ""
+                                      + ""set to true"", getLocation());
+         }
+ 
+         // delete the single file
+         if (file != null) {
+             if (file.exists()) {
+                 if (file.isDirectory()) {
+                     log(""Directory "" + file.getAbsolutePath()
+                         + "" cannot be removed using the file attribute.  ""
+-                        + ""Use dir instead."");
++                        + ""Use dir instead."", quiet ? Project.MSG_VERBOSE : verbosity);
+                 } else {
+                     log(""Deleting: "" + file.getAbsolutePath());
+ 
+                     if (!delete(file)) {
+                         handle(""Unable to delete file "" + file.getAbsolutePath());
+                     }
+                 }
+             } else {
+                 log(""Could not find file "" + file.getAbsolutePath()
+-                    + "" to delete."",
+-                    Project.MSG_VERBOSE);
++                    + "" to delete."", quiet ? Project.MSG_VERBOSE : verbosity);
+             }
+         }
+ 
+         // delete the directory
+         if (dir != null && dir.exists() && dir.isDirectory()
+             && !usedMatchingTask) {
+             /*
+                If verbosity is MSG_VERBOSE, that mean we are doing
+                regular logging (backwards as that sounds).  In that
+                case, we want to print one message about deleting the
+                top of the directory tree.  Otherwise, the removeDir
+                method will handle messages for _all_ directories.
+              */
+             if (verbosity == Project.MSG_VERBOSE) {
+                 log(""Deleting directory "" + dir.getAbsolutePath());
+             }
+             removeDir(dir);
+         }
+         Resources resourcesToDelete = new Resources();
+         resourcesToDelete.setProject(getProject());
+         Resources filesetDirs = new Resources();
+         filesetDirs.setProject(getProject());
+ 
+-        for (int i = 0; i < filesets.size(); i++) {
++        for (int i = 0, size = filesets.size(); i < size; i++) {
+             FileSet fs = (FileSet) filesets.get(i);
+             if (fs.getProject() == null) {
+                 log(""Deleting fileset with no project specified;""
+                     + "" assuming executing project"", Project.MSG_VERBOSE);
+                 fs = (FileSet) fs.clone();
+                 fs.setProject(getProject());
+             }
+             resourcesToDelete.add(fs);
+             if (includeEmpty && fs.getDir().isDirectory()) {
+               filesetDirs.add(new ReverseDirs(fs.getDir(),
+                   fs.getDirectoryScanner().getIncludedDirectories()));
+             }
+         }
+         if (usedMatchingTask && dir != null && dir.isDirectory()) {
+             //add the files from the default fileset:
+             FileSet implicit = getImplicitFileSet();
+             resourcesToDelete.add(implicit);
+             if (includeEmpty) {
+               filesetDirs.add(new ReverseDirs(dir,
+                   implicit.getDirectoryScanner().getIncludedDirectories()));
+             }
+         }
+         resourcesToDelete.add(filesetDirs);
+         if (rcs != null) {
+             // sort first to files, then dirs
+             Restrict exists = new Restrict();
+             exists.add(EXISTS);
+             exists.add(rcs);
+             Sort s = new Sort();
+             s.add(REVERSE_FILESYSTEM);
+             s.add(exists);
+             resourcesToDelete.add(s);
+         }
+         try {
+             if (resourcesToDelete.isFilesystemOnly()) {
+                 for (Iterator iter = resourcesToDelete.iterator(); iter.hasNext();) {
+                     FileResource r = (FileResource) iter.next();
+                     // nonexistent resources could only occur if we already
+                     // deleted something from a fileset:
+                     if (!r.isExists()) {
+                         continue;
+                     }
+                     if (!(r.isDirectory()) || r.getFile().list().length == 0) {
+                         log(""Deleting "" + r, verbosity);
+                         if (!delete(r.getFile()) && failonerror) {
+                             handle(""Unable to delete ""
+                                 + (r.isDirectory() ? ""directory "" : ""file "") + r);
+                         }
+                     }
+                 }
+             } else {
+                  handle(getTaskName() + "" handles only filesystem resources"");
+             }
+         } catch (Exception e) {
+             handle(e);
+         }
+     }
+\ No newline at end of file
+",Buggy,"fix bug#32738, implement quiet check for every message logged
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@395510 13f79535-47bb-0310-9956-ffa450edef68
+"
+spring-framework,16585.json,67a06f5edcc8697af0941e238ef29bdb2a73245d,"@@ -1,3 +1,3 @@
+ 	static Builder from(ClientResponse other) {
+-		return new DefaultClientResponseBuilder(other);
++		return new DefaultClientResponseBuilder(other, false);
+ 	}
+\ No newline at end of file
+",Buggy,"Add mutate() to ClientResponse and deprecate from()
+
+from() has the flaw of ignoring the body and it can't be fixed because
+applications are guaranteed to be setting it already and if set twice
+the builder drains the first body.
+
+mutate() is a better fit in any case for what needs to be done in a
+filter chain. It can be done more efficiently and is consistent with
+similar options on the server side.
+
+See gh-24680
+"
+lucene-solr,14918.json,8bd7e5c9d254c1d629a784e0b601885adea2f57b,"@@ -1,20 +1,3 @@
+   public static SolrDocument convertLuceneDocToSolrDoc(Document doc, final IndexSchema schema) {
+-    SolrDocument out = new SolrDocument();
+-    for (IndexableField f : doc.getFields()) {
+-      // Make sure multivalued fields are represented as lists
+-      Object existing = out.get(f.name());
+-      if (existing == null) {
+-        SchemaField sf = schema.getFieldOrNull(f.name());
+-        if (sf != null && sf.multiValued()) {
+-          List<Object> vals = new ArrayList<>();
+-          vals.add(f);
+-          out.setField(f.name(), vals);
+-        } else {
+-          out.setField(f.name(), f);
+-        }
+-      } else {
+-        out.addField(f.name(), f);
+-      }
+-    }
+-    return out;
++    return convertLuceneDocToSolrDoc(doc,schema, new SolrReturnFields());
+   }
+\ No newline at end of file
+",NotBuggy,"SOLR-11891: DocStreamer now respects the ReturnFields when populating a SolrDocument
+This is an optimization that reduces the number of unneccessary fields a ResponseWriter will see if documentCache is used
+
+This commit also includes fixes for SOLR-12107 & SOLR-12108 -- two bugs that were previously dependent on the
+un-optimized behavior of DocStreamer in order to function properly.
+
+- SOLR-12107: Fixed a error in [child] transformer that could ocur if documentCache was not used
+- SOLR-12108: Fixed the fallback behavior of [raw] and [xml] transformers when an incompatble 'wt' was specified,
+  the field value was lost if documentCache was not used.
+"
+guava,18902.json,314727b81a4f45210ab53ebd46b695150ea36f8c,"@@ -1,14 +1,11 @@
+   public static long copy(Readable from, Appendable to) throws IOException {
+     CharBuffer buf = CharBuffer.allocate(BUF_SIZE);
+     long total = 0;
+-    while (true) {
+-      int r = from.read(buf);
+-      if (r == -1) {
+-        break;
+-      }
++    while (from.read(buf) != -1) {
+       buf.flip();
+-      to.append(buf, 0, r);
+-      total += r;
++      to.append(buf);
++      total += buf.remaining();
++      buf.clear();
+     }
+     return total;
+   }
+\ No newline at end of file
+",Buggy,"Fix a bug with CharStreams.copy not clearing its buffer after reading.
+
+Guava issue 1061: http://code.google.com/p/guava-libraries/issues/detail?id=1061
+-------------
+Created by MOE: http://code.google.com/p/moe-java
+MOE_MIGRATED_REVID=31793143"
+hbase,1189.json,2beda62a10f0828eb10cec28b0ba53246cd0b671,"@@ -1,5 +1,4 @@
+   public static void main(String[] args) throws Exception {
+-    if (conf == null) conf = HBaseConfiguration.create();
+-    int ret = ToolRunner.run(conf, new ReplicationSyncUp(), args);
++    int ret = ToolRunner.run(HBaseConfiguration.create(), new ReplicationSyncUp(), args);
+     System.exit(ret);
+   }
+\ No newline at end of file
+",NotBuggy,"HBASE-20083 Fix findbugs error for ReplicationSyncUp
+"
+lucene-solr,46444.json,e283271aaf6da3033156f36b421d3241b5499d4e,"@@ -1,61 +1,65 @@
+   private List<CodecReader> maybeSortReaders(List<CodecReader> originalReaders, SegmentInfo segmentInfo) throws IOException {
+ 
+     // Default to identity:
+     for(int i=0;i<originalReaders.size();i++) {
+       leafDocMaps[i] = new DocMap() {
+           @Override
+           public int get(int docID) {
+             return docID;
+           }
+         };
+     }
+ 
+     Sort indexSort = segmentInfo.getIndexSort();
+     if (indexSort == null) {
+       return originalReaders;
+     }
+ 
+     // If an incoming reader is not sorted, because it was flushed by IW, we sort it here:
+     final Sorter sorter = new Sorter(indexSort);
+     List<CodecReader> readers = new ArrayList<>(originalReaders.size());
+ 
+     for (CodecReader leaf : originalReaders) {
+       Sort segmentSort = leaf.getIndexSort();
+ 
+       if (segmentSort == null) {
+         // TODO: fix IW to also sort when flushing?  It's somewhat tricky because of stored fields and term vectors, which write ""live""
+         // to their index files on each indexed document:
+ 
+         // This segment was written by flush, so documents are not yet sorted, so we sort them now:
++        long t0 = System.nanoTime();
+         Sorter.DocMap sortDocMap = sorter.sort(leaf);
++        long t1 = System.nanoTime();
++        double msec = (t1-t0)/1000000.0;
++        
+         if (sortDocMap != null) {
+           if (infoStream.isEnabled(""SM"")) {
+-            infoStream.message(""SM"", ""segment "" + leaf + "" is not sorted; wrapping for sort "" + indexSort + "" now"");
++            infoStream.message(""SM"", String.format(Locale.ROOT, ""segment %s is not sorted; wrapping for sort %s now (%.2f msec to sort)"", leaf, indexSort, msec));
+           }
+           leaf = SlowCodecReaderWrapper.wrap(SortingLeafReader.wrap(new MergeReaderWrapper(leaf), sortDocMap));
+           leafDocMaps[readers.size()] = new DocMap() {
+               @Override
+               public int get(int docID) {
+                 return sortDocMap.oldToNew(docID);
+               }
+             };
+         } else {
+           if (infoStream.isEnabled(""SM"")) {
+-            infoStream.message(""SM"", ""segment "" + leaf + "" is not sorted, but is already accidentally in sort "" + indexSort + "" order"");
++            infoStream.message(""SM"", String.format(Locale.ROOT, ""segment %s is not sorted, but is already accidentally in sort %s order (%.2f msec to sort)"", leaf, indexSort, msec));
+           }
+         }
+ 
+       } else {
+         if (segmentSort.equals(indexSort) == false) {
+           throw new IllegalArgumentException(""index sort mismatch: merged segment has sort="" + indexSort + "" but to-be-merged segment has sort="" + segmentSort);
+         }
+         if (infoStream.isEnabled(""SM"")) {
+           infoStream.message(""SM"", ""segment "" + leaf + "" already sorted"");
+         }
+       }
+ 
+       readers.add(leaf);
+     }
+ 
+     return readers;
+   }
+\ No newline at end of file
+",NotBuggy,"LUCENE-6766: more IW.infoStream logging around sorting; fix test bug
+"
+sonarqube,18846.json,38e53c0572db4e267a704666cb0d1343992df5e1,"@@ -1,19 +1,19 @@
+-  private int resolveOrder(String path) throws CyclicDependenciesException {
++  private int resolveOrder(String path) {
+     seen = true;
+     try {
+       int highOrder = -1;
+       for (Node dep : dependencies) {
+         if (dep.seen) {
+           throw new CyclicDependenciesException(path + "" -> "" + dep.toString());
+         }
+         highOrder = Math.max(highOrder, dep.resolveOrder(path + "" -> "" + dep.toString()));
+ 
+       }
+ 
+       order = highOrder + 1;
+       return order;
+ 
+     } finally {
+       seen = false;
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"Fix some quality flaws
+"
+hbase,5736.json,c24cf2d55ecd479c89b0613b6ebbdaba4eb793ad,"@@ -1,16 +1,19 @@
+   private List<RegionInfo> getRegions(final Address server) {
+     LinkedList<RegionInfo> regions = new LinkedList<>();
+     for (Map.Entry<RegionInfo, ServerName> el :
+         master.getAssignmentManager().getRegionStates().getRegionAssignments().entrySet()) {
+-      if (el.getValue() == null) continue;
++      if (el.getValue() == null) {
++        continue;
++      }
++
+       if (el.getValue().getAddress().equals(server)) {
+         addRegion(regions, el.getKey());
+       }
+     }
+     for (RegionStateNode state : master.getAssignmentManager().getRegionsInTransition()) {
+       if (state.getRegionLocation().getAddress().equals(server)) {
+         addRegion(regions, state.getRegionInfo());
+       }
+     }
+     return regions;
+   }
+\ No newline at end of file
+",NotBuggy,"HBASE-19601 Fixed Checkstyle errors in hbase-rsgroup and enabled Checkstyle to fail on violations
+"
+lucene-solr,47123.json,52d1ab79192a331e1f3fc5f5a202d6a4c5a633b2,"@@ -1,23 +1,27 @@
+-  ByteBuffer[] map(FileChannel fc, long offset, long length) throws IOException {
++  final ByteBuffer[] map(String resourceDescription, FileChannel fc, long offset, long length) throws IOException {
+     if ((length >>> chunkSizePower) >= Integer.MAX_VALUE)
+-      throw new IllegalArgumentException(""RandomAccessFile too big for chunk size: "" + fc.toString());
++      throw new IllegalArgumentException(""RandomAccessFile too big for chunk size: "" + resourceDescription);
+     
+     final long chunkSize = 1L << chunkSizePower;
+     
+     // we always allocate one more buffer, the last one may be a 0 byte one
+     final int nrBuffers = (int) (length >>> chunkSizePower) + 1;
+     
+     ByteBuffer buffers[] = new ByteBuffer[nrBuffers];
+     
+     long bufferStart = 0L;
+     for (int bufNr = 0; bufNr < nrBuffers; bufNr++) { 
+       int bufSize = (int) ( (length > (bufferStart + chunkSize))
+           ? chunkSize
+               : (length - bufferStart)
+           );
+-      buffers[bufNr] = fc.map(MapMode.READ_ONLY, offset + bufferStart, bufSize);
++      try {
++        buffers[bufNr] = fc.map(MapMode.READ_ONLY, offset + bufferStart, bufSize);
++      } catch (IOException ioe) {
++        throw convertMapFailedIOException(ioe, resourceDescription, bufSize);
++      }
+       bufferStart += bufSize;
+     }
+     
+     return buffers;
+   }
+\ No newline at end of file
+",Buggy,"LUCENE-5673: MMapDirectory: Work around a ""bug"" in the JDK that throws a confusing OutOfMemoryError wrapped inside IOException if the FileChannel  mapping failed because of lack of virtual address space. The IOException is rethrown with more useful information about the problem, omitting the incorrect OutOfMemoryError
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1595213 13f79535-47bb-0310-9956-ffa450edef68
+"
+sonarqube,13389.json,1c73879c6bd7bb325e7e95acfadbb8431adc39f3,"@@ -1,16 +1,16 @@
+-  private static DbCommons.TextRange.Builder convertTextRange(BatchReport.TextRange sourceRange) {
+-    DbCommons.TextRange.Builder targetRange = DbCommons.TextRange.newBuilder();
+-    if (sourceRange.hasStartLine()) {
+-      targetRange.setStartLine(sourceRange.getStartLine());
+-    }
+-    if (sourceRange.hasStartOffset()) {
+-      targetRange.setStartOffset(sourceRange.getStartOffset());
+-    }
+-    if (sourceRange.hasEndLine()) {
+-      targetRange.setEndLine(sourceRange.getEndLine());
+-    }
+-    if (sourceRange.hasEndOffset()) {
+-      targetRange.setEndOffset(sourceRange.getEndOffset());
+-    }
+-    return targetRange;
+-  }
+\ No newline at end of file
++    private DbCommons.TextRange.Builder convertTextRange(BatchReport.TextRange sourceRange) {
++      DbCommons.TextRange.Builder targetRange = DbCommons.TextRange.newBuilder();
++      if (sourceRange.hasStartLine()) {
++        targetRange.setStartLine(sourceRange.getStartLine());
++      }
++      if (sourceRange.hasStartOffset()) {
++        targetRange.setStartOffset(sourceRange.getStartOffset());
++      }
++      if (sourceRange.hasEndLine()) {
++        targetRange.setEndLine(sourceRange.getEndLine());
++      }
++      if (sourceRange.hasEndOffset()) {
++        targetRange.setEndOffset(sourceRange.getEndOffset());
++      }
++      return targetRange;
++    }
+\ No newline at end of file
+",NotBuggy,"Fix quality flaws
+"
+weka,19490.json,90f4455c8174476ac55591cfcab3ea403fa3db02,"@@ -1,17 +1,18 @@
+   public void acceptInstance(InstanceEvent e) {
+     if (e.getStatus() == InstanceEvent.FORMAT_AVAILABLE) {
+       //      Instances dataSet = e.getInstance().dataset();
+       m_connectedFormat = e.getStructure();
+       
+       //      System.err.println(""Assigning class column..."");
+       assignClass(m_connectedFormat);
+       notifyInstanceListeners(e);
+ 
+       // tell any listening customizers (or other interested parties)
++      System.err.println(""Notifying customizer..."");
+       notifyDataFormatListeners();
+     } else {
+       //      Instances dataSet = e.getInstance().dataset();
+       //      assignClass(dataSet);
+       notifyInstanceListeners(e);
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"Fixed bug in format handling
+
+
+git-svn-id: https://svn.cms.waikato.ac.nz/svn/weka/trunk@1966 e0a1b77d-ad91-4216-81b1-defd5f83fa92
+"
+sonarqube,9312.json,e582be977c992d38fff928388bb1f1ae928fd146,"@@ -1,16 +1,15 @@
+   public List<CeTask> massSubmit(Collection<CeTaskSubmit> submissions, SubmitOption... options) {
+-    checkState(!submitPaused.get(), ""Compute Engine does not currently accept new tasks"");
+     if (submissions.isEmpty()) {
+       return Collections.emptyList();
+     }
+ 
+     try (DbSession dbSession = dbClient.openSession(true)) {
+       List<CeQueueDto> ceQueueDtos = submissions.stream()
+         .filter(filterBySubmitOptions(options, submissions, dbSession))
+         .map(submission -> addToQueueInDb(dbSession, submission))
+         .collect(Collectors.toList());
+       List<CeTask> tasks = loadTasks(dbSession, ceQueueDtos);
+       dbSession.commit();
+       return tasks;
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"Fix Quality flaws
+
+mainly by removing unused code
+"
+sonarqube,20010.json,5e0b742ac8299c7ddcd2bf3dfe682482c4d8eda4,"@@ -1,9 +1,9 @@
+   private static void cleanTempFolders(Path path) throws IOException {
+-    if (Files.exists(path)) {
++    if (path.toFile().exists()) {
+       try (DirectoryStream<Path> stream = Files.newDirectoryStream(path, new CleanFilter())) {
+         for (Path p : stream) {
+           deleteQuietly(p.toFile());
+         }
+       }
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"Fix Quality flaws
+"
+weka,20096.json,f39f7d042b70f510b9721bbff0535ef0a3d348a8,"@@ -1,38 +1,40 @@
+   public void performRequest(String request) {
+     if (request.compareTo(""Show chart"") == 0) {
+       try {
+-	// popup visualize panel
+-	if (!m_framePoppedUp) {
+-	  m_framePoppedUp = true;
++        // popup visualize panel
++        if (!m_framePoppedUp) {
++          m_framePoppedUp = true;
+ 
+-	  final javax.swing.JFrame jf = 
+-	    new javax.swing.JFrame(""Model Performance Chart"");
+-	  jf.setSize(800,600);
+-	  jf.getContentPane().setLayout(new BorderLayout());
+-	  jf.getContentPane().add(m_visPanel, BorderLayout.CENTER);
+-	  jf.addWindowListener(new java.awt.event.WindowAdapter() {
+-	      public void windowClosing(java.awt.event.WindowEvent e) {
+-		jf.dispose();
+-		m_framePoppedUp = false;
+-	      }
+-	    });
+-	  jf.setVisible(true);
+-	  m_popupFrame = jf;
+-	} else {
+-	  m_popupFrame.toFront();
+-	}
++          final javax.swing.JFrame jf = new javax.swing.JFrame(
++              ""Model Performance Chart"");
++          jf.setSize(800, 600);
++          jf.getContentPane().setLayout(new BorderLayout());
++          jf.getContentPane().add(m_visPanel, BorderLayout.CENTER);
++          jf.addWindowListener(new java.awt.event.WindowAdapter() {
++            @Override
++            public void windowClosing(java.awt.event.WindowEvent e) {
++              jf.dispose();
++              m_framePoppedUp = false;
++            }
++          });
++          jf.setVisible(true);
++          m_popupFrame = jf;
++        } else {
++          m_popupFrame.toFront();
++        }
+       } catch (Exception ex) {
+-	ex.printStackTrace();
+-	m_framePoppedUp = false;
++        ex.printStackTrace();
++        m_framePoppedUp = false;
+       }
+     } else if (request.equals(""Clear all plots"")) {
+-        m_visPanel.removeAllPlots();
+-        m_visPanel.validate(); m_visPanel.repaint();
+-        m_visPanel = null;
+-        m_masterPlot = null;
+-        m_offscreenPlotData = null;
++      m_visPanel.removeAllPlots();
++      m_visPanel.validate();
++      m_visPanel.repaint();
++      m_visPanel = null;
++      m_masterPlot = null;
++      m_offscreenPlotData = null;
+     } else {
+       throw new IllegalArgumentException(request
+-					 + "" not supported (Model Performance Chart)"");
++          + "" not supported (Model Performance Chart)"");
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"Fixed a bug for error plots where once the master plot had been set it did not get changed for subsequent incoming VisualizableErrorEvents (unless manually clearing all plots via the GUI).
+
+git-svn-id: https://svn.cms.waikato.ac.nz/svn/weka/trunk@9452 e0a1b77d-ad91-4216-81b1-defd5f83fa92
+"
+guava,11437.json,b4cf74aa3a56751f25ae09eb79b68e0656d40618,"@@ -1,25 +1,21 @@
+   public String collapseFrom(CharSequence sequence, char replacement) {
+-    int first = indexIn(sequence);
+-    if (first == -1) {
+-      return sequence.toString();
+-    }
+-
+-    // TODO(kevinb): see if this implementation can be made faster
+-    StringBuilder builder = new StringBuilder(sequence.length())
+-        .append(sequence.subSequence(0, first))
+-        .append(replacement);
+-    boolean in = true;
+-    for (int i = first + 1; i < sequence.length(); i++) {
++    // This implementation avoids unnecessary allocation.
++    int len = sequence.length();
++    for (int i = 0; i < len; i++) {
+       char c = sequence.charAt(i);
+       if (matches(c)) {
+-        if (!in) {
+-          builder.append(replacement);
+-          in = true;
++        if (c == replacement
++            && (i == len - 1 || !matches(sequence.charAt(i + 1)))) {
++          // a no-op replacement
++          i++;
++        } else {
++          StringBuilder builder = new StringBuilder(len)
++              .append(sequence.subSequence(0, i))
++              .append(replacement);
++          return finishCollapseFrom(sequence, i + 1, len, replacement, builder, true);
+         }
+-      } else {
+-        builder.append(c);
+-        in = false;
+       }
+     }
+-    return builder.toString();
++    // no replacement needed
++    return sequence.toString();
+   }
+\ No newline at end of file
+",NotBuggy,"Optimize collapseFrom and trimAndCollapseFrom so that they
+only allocate if necessary.  Add a few tests.  Remove the GWT
+workarounds for GWT bug 4491 since it appears to be fixed.
+-------------
+Created by MOE: http://code.google.com/p/moe-java
+MOE_MIGRATED_REVID=39757514"
+hbase,7228.json,84a50393ee56d09abb68f54b44b64f5279bd33c9,"@@ -1,8 +1,8 @@
+-  public long refill(long limit, long available) {
++  public long refill(long limit) {
+     final long now = EnvironmentEdgeManager.currentTime();
+     if (now < nextRefillTime) {
+       return 0;
+     }
+     nextRefillTime = now + super.getTimeUnitInMillis();
+     return limit;
+   }
+\ No newline at end of file
+",NotBuggy,HBASE-13888 Fix refill bug from HBASE-13686 (Guanghao Zhang)
+ant,8194.json,f83f5c68c975f31a384cc24e94be4e5ebfa2da4d,"@@ -1,11 +1,10 @@
+     public void verifySettings() {
+         if (dateTime == null && millis < 0) {
+             setError(""You must provide a datetime or the number of ""
+-                + ""milliseconds."");
+-        }
+-        else if (millis < 0) {
++                    + ""milliseconds."");
++        } else if (millis < 0) {
+             setError(""Date of "" + dateTime
+-                + "" results in negative milliseconds""
+-                + "" value relative to epoch (January 1, 1970, 00:00:00 GMT)."");
++                    + "" results in negative milliseconds value""
++                    + "" relative to epoch (January 1, 1970, 00:00:00 GMT)."");
+         }
+     }
+\ No newline at end of file
+",NotBuggy,"First pass at fixing checkstyle issues by using IDEA to reformat code and identify problem spots
+
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@274773 13f79535-47bb-0310-9956-ffa450edef68
+"
+pmd,3084.json,6619e19d3558abf87dbf0b3f0047e355d593043b,"@@ -1,25 +1,25 @@
+     public void publish(LogRecord logRecord) {
+         //Map the log levels from java.util.logging to Ant
+         int antLevel;
+         Level level = logRecord.getLevel();
+         if (level == Level.FINEST)
+             antLevel = Project.MSG_DEBUG;   //Shown when -debug is supplied to Ant
+         else if (level == Level.FINE || level == Level.FINER || level == Level.CONFIG)
+             antLevel = Project.MSG_VERBOSE; //Shown when -verbose is supplied to Ant
+         else if (level == Level.INFO)
+             antLevel = Project.MSG_INFO;    //Always shown
+         else if (level == Level.WARNING)
+             antLevel = Project.MSG_WARN;    //Always shown
+         else if (level == Level.SEVERE)
+             antLevel = Project.MSG_ERR;     //Always shown
+         else
+             throw new IllegalStateException(""Unknown logging level"");   //shouldn't get ALL or NONE
+         
+-        antTask.log(logRecord.getMessage(), antLevel);
++        antTask.log(FORMATTER.format(logRecord), antLevel);
+         if (logRecord.getThrown() != null) {
+             StringWriter stringWriter = new StringWriter();
+             PrintWriter printWriter = new PrintWriter(stringWriter, true);
+             logRecord.getThrown().printStackTrace(printWriter);
+             antTask.log(stringWriter.toString(), antLevel);
+         }
+     }
+\ No newline at end of file
+",NotBuggy,"Fixed formatting problems in loggers
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@5905 51baf565-9d33-0410-a72c-fc3788e3496d"
+sonarqube,4891.json,289be70bf6056b5f3c66a797ecab019891e731d6,"@@ -1,28 +1,30 @@
+   public void handle(Request request, Response response) throws Exception {
+     int pageSize = request.mandatoryParamAsInt(Param.PAGE_SIZE);
+     int page = request.mandatoryParamAsInt(Param.PAGE);
+     String queryString = request.param(Param.TEXT_QUERY);
+     String selected = request.mandatoryParam(Param.SELECTED);
+ 
+     try (DbSession dbSession = dbClient.openSession(false)) {
+       GroupId group = support.findGroup(dbSession, request);
+       userSession.checkPermission(OrganizationPermission.ADMINISTER, group.getOrganizationUuid());
+ 
+       UserMembershipQuery query = UserMembershipQuery.builder()
+         .groupId(group.getId())
+         .organizationUuid(group.getOrganizationUuid())
+         .memberSearch(queryString)
+         .membership(getMembership(selected))
+         .pageIndex(page)
+         .pageSize(pageSize)
+         .build();
+       int total = dbClient.groupMembershipDao().countMembers(dbSession, query);
+       Paging paging = forPageIndex(page).withPageSize(pageSize).andTotal(total);
+       List<UserMembershipDto> users = dbClient.groupMembershipDao().selectMembers(dbSession, query, paging.offset(), paging.pageSize());
+ 
+-      JsonWriter json = response.newJsonWriter().beginObject();
+-      writeMembers(json, users);
+-      writePaging(json, paging);
+-      json.endObject().close();
++      try (JsonWriter json = response.newJsonWriter()) {
++        json.beginObject();
++        writeMembers(json, users);
++        writePaging(json, paging);
++        json.endObject();
++      }
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"Fix Quality flaws
+"
+sonarqube,7206.json,fd78d281d57d7b1ffa49d27cd03de39b6a961592,"@@ -1,12 +1,12 @@
+   private static Optional<String> getTokenFromCookie(HttpServletRequest request) {
+     Optional<Cookie> jwtCookie = findCookie(JWT_COOKIE, request);
+     if (!jwtCookie.isPresent()) {
+       return Optional.empty();
+     }
+     Cookie cookie = jwtCookie.get();
+     String token = cookie.getValue();
+-    if (isNullOrEmpty(token)) {
++    if (isEmpty(token)) {
+       return Optional.empty();
+     }
+     return Optional.of(token);
+   }
+\ No newline at end of file
+",NotBuggy,"Fix Quality flaws
+
+- missing tests for Protobuf
+- remove incorrect imports of org.elasticsearch.common.Strings
+"
+weka,20414.json,d5169a182f63b31a737d9b5d57ecdb49b8fbd56a,"@@ -1,15 +1,15 @@
+   protected void newStructure() throws Exception {
+     
+     m_Loader.reset();
+     
+     // Set environment variables
+     if (m_Loader instanceof EnvironmentHandler && m_env != null) {
+       try {
+         ((EnvironmentHandler)m_Loader).setEnvironment(m_env);
+       }catch (Exception ex) {
+       }
+     }
+     m_dataFormat = m_Loader.getStructure();
+-//    System.out.println(""[Loader] Notifying listeners of instance structure avail."");
+-//    notifyStructureAvailable(m_dataFormat);
++    System.out.println(""[Loader] Notifying listeners of instance structure avail."");
++    notifyStructureAvailable(m_dataFormat);
+   }  
+\ No newline at end of file
+",Buggy,"Fixed a bug where configuration changes (new files selected or database configuration changed) was not getting sent to downstream steps
+
+git-svn-id: https://svn.cms.waikato.ac.nz/svn/weka/trunk@7854 e0a1b77d-ad91-4216-81b1-defd5f83fa92
+"
+pmd,412.json,604a45d941cf2042c5c548490ef4401ad54080c9,"@@ -1,12 +1,10 @@
+     private void logRulesUsed(RuleSets rules) {
+         log(""Using these rulesets: "" + ruleSetFiles, Project.MSG_VERBOSE);
+ 
+         RuleSet[] ruleSets = rules.getAllRuleSets();
+-        for (int j = 0; j < ruleSets.length; j++) {
+-            RuleSet ruleSet = ruleSets[j];
+-
++        for (RuleSet ruleSet : ruleSets) {
+             for (Rule rule: ruleSet.getRules()) {
+                 log(""Using rule "" + rule.getName(), Project.MSG_VERBOSE);
+             }
+         }
+     }
+\ No newline at end of file
+",NotBuggy,"Fixed bug 1943204 - Ant task: <ruleset> path should be relative to Ant basedir
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@6441 51baf565-9d33-0410-a72c-fc3788e3496d"
+weka,24326.json,0613647d320672d37f6da68efd32bd14bb88435b,"@@ -1,71 +1,63 @@
+   protected void doAverageResult(Object [] template) throws Exception {
+ 
+     // Generate the key and ask whether the result is required
+     String [] newKey = new String [template.length - 1];
+     System.arraycopy(template, 0, newKey, 0, m_KeyIndex);
+     System.arraycopy(template, m_KeyIndex + 1,
+ 		     newKey, m_KeyIndex,
+ 		     template.length - m_KeyIndex - 1);
+-    /*
+-    System.err.println(""new key: "" + DatabaseUtils.arrayToString(newKey));
+-    */
+     if (m_ResultListener.isResultRequired(this, newKey)) {
+       Object [] resultTypes = m_ResultProducer.getResultTypes();
+       Stats [] stats = new Stats [resultTypes.length];
+       for (int i = 0; i < stats.length; i++) {
+ 	stats[i] = new Stats();
+       }
+       Object [] result = getResultTypes();
+       int numMatches = 0;
+       for (int i = 0; i < m_Keys.size(); i++) {
+ 	Object [] currentKey = (Object [])m_Keys.elementAt(i);
+ 	// Skip non-matching keys
+ 	if (!matchesTemplate(template, currentKey)) {
+ 	  continue;
+ 	}
+ 	// Add the results to the stats accumulator
+ 	Object [] currentResult = (Object [])m_Results.elementAt(i);
+ 	numMatches++;
+-	/*
+-	System.err.println(""Match: "" + DatabaseUtils.arrayToString(currentKey)
+-			   + "" -- ""
+-			   + DatabaseUtils.arrayToString(currentResult));
+-	*/
+ 	for (int j = 0; j < resultTypes.length; j++) {
+ 	  if (resultTypes[j] instanceof Double) {
+ 	    if (currentResult[j] == null) {
+ 	      throw new Exception(""Null numeric result field found:\n""
+ 				  + DatabaseUtils.arrayToString(currentKey)
+ 				  + "" -- ""
+ 				  + DatabaseUtils
+ 				  .arrayToString(currentResult));
+ 	    }
+ 	    double currentVal = ((Double)currentResult[j]).doubleValue();
+ 	    stats[j].add(currentVal);
+ 	  }
+ 	}
+       }
+       if (numMatches != m_ExpectedResultsPerAverage) {
+ 	throw new Exception(""Expected "" + m_ExpectedResultsPerAverage
+ 			    + "" results matching key \""""
+ 			    + DatabaseUtils.arrayToString(template)
+ 			    + ""\"" but got ""
+ 			    + numMatches);
+       }
+       result[0] = new Double(numMatches);
+       Object [] currentResult = (Object [])m_Results.elementAt(0);
+       int k = 1;
+       for (int j = 0; j < resultTypes.length; j++) {
+ 	if (resultTypes[j] instanceof Double) {
+ 	  stats[j].calculateDerived();
+ 	  result[k++] = new Double(stats[j].mean);
+ 	  if (getCalculateStdDevs()) {
+ 	    result[k++] = new Double(stats[j].stdDev);
+ 	  }
+ 	} else {
+ 	  result[k++] = currentResult[j];
+ 	}
+       }
+       m_ResultListener.acceptResult(this, newKey, result);      
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"- Fixed bug where sometimes the sub-ResultProducer would not be correctly
+connected.
+
+
+git-svn-id: https://svn.cms.waikato.ac.nz/svn/weka/trunk@171 e0a1b77d-ad91-4216-81b1-defd5f83fa92
+"
+guava,15643.json,2ef955163b3d43e7849c1929ef4e5d714b93da96,"@@ -1,16 +1,16 @@
+-    int getCorrectLastElement(E actualLastElement) {
++    int swapWithConceptuallyLastElement(E actualLastElement) {
+       int parentIndex = getParentIndex(size);
+       if (parentIndex != 0) {
+         int grandparentIndex = getParentIndex(parentIndex);
+         int uncleIndex = getRightChildIndex(grandparentIndex);
+         if (uncleIndex != parentIndex && getLeftChildIndex(uncleIndex) >= size) {
+           E uncleElement = elementData(uncleIndex);
+           if (ordering.compare(uncleElement, actualLastElement) < 0) {
+             queue[uncleIndex] = actualLastElement;
+             queue[size] = uncleElement;
+             return uncleIndex;
+           }
+         }
+       }
+       return size;
+     }
+\ No newline at end of file
+",NotBuggy,"Fix two bugs in MinMaxPriorityQueue (introduced in [] First is a bug in removeAt(int) that sometimes causes the wrong element to be removed. Second is a bug that sometimes causes certain elements to be iterated over more than once if elements were removed during iteration.
+
+Reported externally at https://github.com/google/guava/issues/2658
+
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=140382230"
+voldemort,9441.json,e7ecec1bd3dd879221a56714fc774a2001d843e8,"@@ -1,35 +1,36 @@
+     public void run() {
+         Node proxyNode = metadata.getCluster().getNodeById(destinationNode);
+         long startNs = System.nanoTime();
+         try {
+             // TODO there are no retries now if the node we want to write to is
+             // unavailable
+             redirectingStore.checkNodeAvailable(proxyNode);
+             Store<ByteArray, byte[], byte[]> socketStore = redirectingStore.getRedirectingSocketStore(redirectingStore.getName(),
+                                                                                                       destinationNode);
+ 
+             socketStore.put(key, value, transforms);
+             redirectingStore.recordSuccess(proxyNode, startNs);
++            redirectingStore.reportProxyPutSuccess();
+             if(logger.isTraceEnabled()) {
+                 logger.trace(""Proxy write for store "" + redirectingStore.getName() + "" key ""
+-                             + ByteUtils.toBinaryString(key.get()) + "" to destinationNode:""
++                             + ByteUtils.toHexString(key.get()) + "" to destinationNode:""
+                              + destinationNode);
+             }
+         } catch(UnreachableStoreException e) {
+             redirectingStore.recordException(proxyNode, startNs, e);
+             logFailedProxyPutIfNeeded(e);
+         } catch(ObsoleteVersionException ove) {
+             /*
+              * Proxy puts can get an OVE if somehow there are two stealers for
+              * the same proxy node and the other stealer's proxy put already got
+              * tothe proxy node.. This will not result from online put winning,
+              * since we don't issue proxy puts if the proxy node is still a
+              * replica
+              */
+             logFailedProxyPutIfNeeded(ove);
+         } catch(Exception e) {
+             // Just log the key.. Not sure having values in the log is a good
+             // idea.
+             logFailedProxyPutIfNeeded(e);
+         }
+     }
+\ No newline at end of file
+",Buggy,"1.Enabling proxy puts by dafault
+2. Bug fix in proxy put stats
+3. Changing order of state change updates for correctness
+4. Setting proxy put tests to do one batch rebalancing
+"
+lucene-solr,46441.json,e283271aaf6da3033156f36b421d3241b5499d4e,"@@ -1,45 +1,51 @@
+   private DocMap[] buildDocMaps(List<CodecReader> readers, Sort indexSort) throws IOException {
+ 
+     int numReaders = readers.size();
+ 
+     if (indexSort == null) {
+       // no index sort ... we only must map around deletions, and rebase to the merged segment's docID space
+ 
+       int totalDocs = 0;
+       DocMap[] docMaps = new DocMap[numReaders];
+ 
+       // Remap docIDs around deletions:
+       for (int i = 0; i < numReaders; i++) {
+         LeafReader reader = readers.get(i);
+         Bits liveDocs = reader.getLiveDocs();
+ 
+         final PackedLongValues delDocMap;
+         if (liveDocs != null) {
+           delDocMap = removeDeletes(reader.maxDoc(), liveDocs);
+         } else {
+           delDocMap = null;
+         }
+ 
+         final int docBase = totalDocs;
+         docMaps[i] = new DocMap() {
+           @Override
+           public int get(int docID) {
+             if (liveDocs == null) {
+               return docBase + docID;
+             } else if (liveDocs.get(docID)) {
+               return docBase + (int) delDocMap.get(docID);
+             } else {
+               return -1;
+             }
+           }
+         };
+         totalDocs += reader.numDocs();
+       }
+ 
+       return docMaps;
+ 
+     } else {
+       // do a merge sort of the incoming leaves:
+-      return MultiSorter.sort(indexSort, readers);
++      long t0 = System.nanoTime();
++      DocMap[] result = MultiSorter.sort(indexSort, readers);
++      long t1 = System.nanoTime();
++      if (infoStream.isEnabled(""SM"")) {
++        infoStream.message(""SM"", String.format(Locale.ROOT, ""%.2f msec to build merge sorted DocMaps"", (t1-t0)/1000000.0));
++      }
++      return result;
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"LUCENE-6766: more IW.infoStream logging around sorting; fix test bug
+"
+sonarqube,14062.json,1c73879c6bd7bb325e7e95acfadbb8431adc39f3,"@@ -1,6 +1,6 @@
+-  private static String computeRevision(@Nullable Changeset latestChange) {
+-    if (latestChange == null) {
+-      return null;
+-    }
+-    return latestChange.getRevision();
+-  }
+\ No newline at end of file
++    private String computeRevision(@Nullable Changeset latestChange) {
++      if (latestChange == null) {
++        return null;
++      }
++      return latestChange.getRevision();
++    }
+\ No newline at end of file
+",NotBuggy,"Fix quality flaws
+"
+voldemort,9827.json,8fe6ef89e6f219a246413f918167b573f69e070c,"@@ -1,18 +1,20 @@
+     public boolean delete(ByteArray key, Version version) throws VoldemortException {
+         boolean deleteSuccessful = false;
+         StoreUtils.assertValidKey(key);
+         String keyString = new String(key.get());
+         String initialValue = this.metadataMap.get(keyString);
+         if(initialValue != null) {
+             String removedValue = this.metadataMap.remove(keyString);
+             if(removedValue != null) {
+                 deleteSuccessful = (initialValue.equals(removedValue));
+             }
+         }
+         if(deleteSuccessful) {
+             this.flushData();
+             // Reset the vector clock and persist it.
++            // FIXME this also needs to be done per entry, as opposed to
++            // versioning the file.
+             writeVersion(new VectorClock());
+         }
+         return deleteSuccessful;
+     }
+\ No newline at end of file
+",NotBuggy,"Workaround SystemStore bug and fix quota store inserts
+"
+sonarqube,8517.json,38e53c0572db4e267a704666cb0d1343992df5e1,"@@ -1,35 +1,33 @@
+   public static Collection<String> listResources(ClassLoader classLoader, String rootPath, Predicate<String> predicate) {
+     try {
+       Collection<String> paths = Lists.newArrayList();
+       rootPath = StringUtils.removeStart(rootPath, ""/"");
+ 
+       URL root = classLoader.getResource(rootPath);
+       if (root != null) {
+-        if (!""jar"".equals(root.getProtocol())) {
+-          throw new IllegalStateException(""Unsupported protocol: "" + root.getProtocol());
+-        }
++        checkJarFile(root);
+ 
+         // Path of the root directory
+         // Examples :
+         // org/sonar/sqale/index.txt  -> rootDirectory is org/sonar/sqale
+         // org/sonar/sqale/  -> rootDirectory is org/sonar/sqale
+         // org/sonar/sqale  -> rootDirectory is org/sonar/sqale
+         String rootDirectory = rootPath;
+         if (StringUtils.substringAfterLast(rootPath, ""/"").indexOf('.') >= 0) {
+           rootDirectory = StringUtils.substringBeforeLast(rootPath, ""/"");
+         }
+         String jarPath = root.getPath().substring(5, root.getPath().indexOf(""!"")); //strip out only the JAR file
+         JarFile jar = new JarFile(URLDecoder.decode(jarPath, CharEncoding.UTF_8));
+         Enumeration<JarEntry> entries = jar.entries();
+         while (entries.hasMoreElements()) {
+           String name = entries.nextElement().getName();
+           if (name.startsWith(rootDirectory) && predicate.apply(name)) {
+             paths.add(name);
+           }
+         }
+       }
+       return paths;
+     } catch (Exception e) {
+       throw Throwables.propagate(e);
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"Fix some quality flaws
+"
+lucene-solr,36489.json,75b0b5312c6f7722b88088fbc590259e9cd31567,"@@ -1,39 +1,31 @@
+   private void count(ValueSource valueSource, List<MatchingDocs> matchingDocs) throws IOException {
+ 
+     LongRange[] ranges = (LongRange[]) this.ranges;
+ 
+-    // Compute min & max over all ranges:
+-    long minIncl = Long.MAX_VALUE;
+-    long maxIncl = Long.MIN_VALUE;
+-    for(LongRange range : ranges) {
+-      minIncl = Math.min(minIncl, range.minIncl);
+-      maxIncl = Math.max(maxIncl, range.maxIncl);
+-    }
+-
+     LongRangeCounter counter = new LongRangeCounter(ranges);
+ 
+     int missingCount = 0;
+     for (MatchingDocs hits : matchingDocs) {
+       FunctionValues fv = valueSource.getValues(Collections.emptyMap(), hits.context);
+       final int length = hits.bits.length();
+       int doc = 0;
+       totCount += hits.totalHits;
+       while (doc < length && (doc = hits.bits.nextSetBit(doc)) != -1) {
+         // Skip missing docs:
+         if (fv.exists(doc)) {
+           counter.add(fv.longVal(doc));
+         } else {
+           missingCount++;
+         }
+ 
+         doc++;
+       }
+     }
+     
+     int x = counter.fillCounts(counts);
+ 
+     missingCount += x;
+ 
+     //System.out.println(""totCount "" + totCount + "" missingCount "" + counter.missingCount);
+     totCount -= missingCount;
+   }
+\ No newline at end of file
+",NotBuggy,"fix test bug; remove dead code
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1555715 13f79535-47bb-0310-9956-ffa450edef68
+"
+guava,11604.json,9129e5e50020f84c7a859726b42ce211d2e37e5f,"@@ -1,8 +1,7 @@
+   public Stopwatch stop() {
+     long tick = ticker.read();
+-    checkState(isRunning,
+-        ""This stopwatch is already stopped; it cannot be stopped more than once."");
++    checkState(isRunning, ""This stopwatch is already stopped."");
+     isRunning = false;
+     elapsedNanos += tick - startTick;
+     return this;
+   }
+\ No newline at end of file
+",NotBuggy,"Miscellaneous documentation fixes and internal cleanups.
+- Remove potentially misleading ""it cannot be started/stopped more than once"" from Stopwatch exception messages.
+- Fix TreeTraverser ASCII art.
+- Remove inaccurate @GwtCompatible annotation from FeatureUtil.
+- Fix mistaken duplicate words (""the the,"" etc.).
+- Strip *all* of benchmark running instructions from CharMatcherBenchmark, and preemptively strip instructions from internal escapers benchmarks.
+- Remove test <echo> from ant section of pom.xml.
+- Add @Nullable to StandardBaseEncoding's other constructor's paddingChar parameter.
+- Remove stale comment from Futures. (UninterruptibleFuture is long dead.)
+- Update name of Truth GWT module.
+-------------
+Created by MOE: http://code.google.com/p/moe-java
+MOE_MIGRATED_REVID=42036409"
+lucene-solr,28701.json,ec788948a64955acc0415281f353d4d7b2f797cc,"@@ -1,124 +1,111 @@
+   public SeekStatus scanToTermLeaf(BytesRef target, boolean exactOnly) throws IOException {
+ 
+     // if (DEBUG) System.out.println(""    scanToTermLeaf: block fp="" + fp + "" prefix="" + prefix + "" nextEnt="" + nextEnt + "" (of "" + entCount + "") target="" + OrdsSegmentTermsEnum.brToString(target) + "" term="" + OrdsSegmentTermsEnum.brToString(ste.term));
+ 
+     assert nextEnt != -1;
+ 
+     ste.termExists = true;
+     subCode = 0;
+ 
+     if (nextEnt == entCount) {
+       if (exactOnly) {
+         fillTerm();
+       }
+       return SeekStatus.END;
+     }
+ 
+     assert prefixMatches(target);
+ 
+     // Loop over each entry (term or sub-block) in this block:
+     //nextTerm: while(nextEnt < entCount) {
+     nextTerm: while (true) {
+       nextEnt++;
+       termOrd++;
+ 
+       suffix = suffixesReader.readVInt();
+ 
+       // if (DEBUG) {
+       //    BytesRef suffixBytesRef = new BytesRef();
+       //    suffixBytesRef.bytes = suffixBytes;
+       //    suffixBytesRef.offset = suffixesReader.getPosition();
+       //    suffixBytesRef.length = suffix;
+       //    System.out.println(""      cycle: term "" + (nextEnt-1) + "" (of "" + entCount + "") suffix="" + OrdsSegmentTermsEnum.brToString(suffixBytesRef));
+       // }
+ 
+       final int termLen = prefix + suffix;
+       startBytePos = suffixesReader.getPosition();
+       suffixesReader.skipBytes(suffix);
+ 
+       final int targetLimit = target.offset + (target.length < termLen ? target.length : termLen);
+       int targetPos = target.offset + prefix;
+ 
+       // Loop over bytes in the suffix, comparing to
+       // the target
+       int bytePos = startBytePos;
+       while(true) {
+         final int cmp;
+         final boolean stop;
+         if (targetPos < targetLimit) {
+           cmp = (suffixBytes[bytePos++]&0xFF) - (target.bytes[targetPos++]&0xFF);
+           stop = false;
+         } else {
+           assert targetPos == targetLimit;
+           cmp = termLen - target.length;
+           stop = true;
+         }
+ 
+         if (cmp < 0) {
+           // Current entry is still before the target;
+           // keep scanning
+ 
+           if (nextEnt == entCount) {
+             if (exactOnly) {
+               fillTerm();
+             }
+             // We are done scanning this block
+             break nextTerm;
+           } else {
+             continue nextTerm;
+           }
+         } else if (cmp > 0) {
+ 
+           // Done!  Current entry is after target --
+           // return NOT_FOUND:
+           fillTerm();
+ 
+-          if (!exactOnly && !ste.termExists) {
+-            // We are on a sub-block, and caller wants
+-            // us to position to the next term after
+-            // the target, so we must recurse into the
+-            // sub-frame(s):
+-            ste.currentFrame = ste.pushFrame(null, ste.currentFrame.lastSubFP, termLen, ste.currentFrame.termOrd);
+-            ste.currentFrame.loadBlock();
+-            while (ste.currentFrame.next()) {
+-              ste.currentFrame = ste.pushFrame(null, ste.currentFrame.lastSubFP, ste.term.length, ste.currentFrame.termOrd);
+-              ste.currentFrame.loadBlock();
+-            }
+-          }
+-                
+           //if (DEBUG) System.out.println(""        not found"");
+           return SeekStatus.NOT_FOUND;
+         } else if (stop) {
+           // Exact match!
+ 
+           // This cannot be a sub-block because we
+           // would have followed the index to this
+           // sub-block from the start:
+ 
+           assert ste.termExists;
+           fillTerm();
+           //if (DEBUG) System.out.println(""        found!"");
+           return SeekStatus.FOUND;
+         }
+       }
+     }
+ 
+     // It is possible (and OK) that terms index pointed us
+     // at this block, but, we scanned the entire block and
+     // did not find the term to position to.  This happens
+     // when the target is after the last term in the block
+     // (but, before the next term in the index).  EG
+     // target could be foozzz, and terms index pointed us
+     // to the foo* block, but the last term in this block
+     // was fooz (and, eg, first term in the next block will
+     // bee fop).
+     //if (DEBUG) System.out.println(""      block end"");
+     if (exactOnly) {
+       fillTerm();
+     }
+ 
+     // TODO: not consistent that in the
+     // not-exact case we don't next() into the next
+     // frame here
+     return SeekStatus.END;
+   }
+\ No newline at end of file
+",Buggy,"LUCENE-5819: fix ord bug; add test case; remove dead code
+
+git-svn-id: https://svn.apache.org/repos/asf/lucene/dev/trunk@1612217 13f79535-47bb-0310-9956-ffa450edef68
+"
+ant,10021.json,ececc5c3e332b97f962b94a475408606433ee0e6,"@@ -1,14 +1,14 @@
+-    public boolean tryHardToDelete(File f) {
++    public boolean tryHardToDelete(File f, boolean runGC) {
+         if (!f.delete()) {
+-            if (ON_WINDOWS) {
++            if (runGC) {
+                 System.gc();
+             }
+             try {
+                 Thread.sleep(DELETE_RETRY_SLEEP_MILLIS);
+             } catch (InterruptedException ex) {
+                 // Ignore Exception
+             }
+             return f.delete();
+         }
+         return true;
+     }
+\ No newline at end of file
+",NotBuggy,"Add an option to <delete> to run the GC before retrying a failed build on non-Windows OSes as well.  Might fix the NFS problem described in PR 45786
+
+git-svn-id: https://svn.apache.org/repos/asf/ant/core/trunk@1177305 13f79535-47bb-0310-9956-ffa450edef68
+"
+sonarqube,14622.json,1c73879c6bd7bb325e7e95acfadbb8431adc39f3,"@@ -1,8 +1,8 @@
+-  private static String convertType(Constants.ComponentLinkType reportType) {
+-    String type = typesConverter.get(reportType);
+-    if (type != null) {
+-      return type;
+-    } else {
+-      throw new IllegalArgumentException(String.format(""Unsupported type %s"", reportType.name()));
+-    }
+-  }
+\ No newline at end of file
++    private String convertType(Constants.ComponentLinkType reportType) {
++      String type = typesConverter.get(reportType);
++      if (type != null) {
++        return type;
++      } else {
++        throw new IllegalArgumentException(String.format(""Unsupported type %s"", reportType.name()));
++      }
++    }
+\ No newline at end of file
+",NotBuggy,"Fix quality flaws
+"
+sonarqube,4743.json,fd78d281d57d7b1ffa49d27cd03de39b6a961592,"@@ -1,8 +1,8 @@
+   private UserDto authenticate(HttpServletRequest request) {
+     String login = request.getParameter(""login"");
+     String password = request.getParameter(""password"");
+-    if (isNullOrEmpty(login) || isNullOrEmpty(password)) {
++    if (isEmpty(login) || isEmpty(password)) {
+       throw new UnauthorizedException();
+     }
+     return credentialsAuthenticator.authenticate(login, password, request);
+   }
+\ No newline at end of file
+",NotBuggy,"Fix Quality flaws
+
+- missing tests for Protobuf
+- remove incorrect imports of org.elasticsearch.common.Strings
+"
+pmd,2580.json,e249deb0879da58e78f31eafbafc3992661b5142,"@@ -1,32 +1,32 @@
+     public void findMatches(int min) {
+        /*
+          Assign sort codes to all the pooled code. This should speed
+          up sorting them.
+        */
+         int count = 1;
+         for (Iterator iter = pool.keySet().iterator(); iter.hasNext();) {
+            TokenEntry token = (TokenEntry)iter.next();
+            token.setSortCode(count++);
+         }
+ 
+         MarkComparator mc = new MarkComparator(cpdListener, code);
+         Collections.sort(marks, mc);
+ 
+         MatchCollector coll = new MatchCollector(marks, code, mc);
+         matches = coll.collect(min);
+         Collections.sort(matches);
+ 
+         for (Iterator i = matches(); i.hasNext();) {
+             Match match = (Match)i.next();
+             for (Iterator occurrences = match.iterator(); occurrences.hasNext();) {
+                 Mark mark = (Mark)occurrences.next();
+-                SourceCode sourceCode = (SourceCode)source.get(mark.getTokenSrcID());
+                 match.setLineCount(tokens.getLineCount(mark, match));
+                 if (!occurrences.hasNext()) {
+                     int start = mark.getBeginLine();
+-                    int end = mark.getBeginLine()-1 + tokens.getLineCount(mark, match);
++                    int end = start + match.getLineCount() - 1;
++                    SourceCode sourceCode = (SourceCode)source.get(mark.getTokenSrcID());
+                     match.setSourceCodeSlice(sourceCode.getSlice(start, end));
+                 }
+             }
+         }
+     }
+\ No newline at end of file
+",Buggy,"Fixed bug in the 'source code slice' logic
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@1705 51baf565-9d33-0410-a72c-fc3788e3496d"
+pmd,3080.json,6619e19d3558abf87dbf0b3f0047e355d593043b,"@@ -1,12 +1,12 @@
+     public void publish(LogRecord logRecord) {
+-        System.out.println(logRecord.getMessage());
++        System.out.println(FORMATTER.format(logRecord));
+         if (logRecord.getThrown() != null) {
+             // Use the same channel, to make sure that the stacktrace comes
+             // after the message on the console (using printStackTrace
+             // directly messes things up)
+             StringWriter stringWriter = new StringWriter();
+             PrintWriter printWriter = new PrintWriter(stringWriter, true);
+             logRecord.getThrown().printStackTrace(printWriter);
+             System.out.println(stringWriter.toString());
+         }
+     }
+\ No newline at end of file
+",NotBuggy,"Fixed formatting problems in loggers
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@5905 51baf565-9d33-0410-a72c-fc3788e3496d"
+guava,11957.json,4362a4529306ea43e177fae2d0457e794dd77cd6,"@@ -1,24 +1,24 @@
+     private int collectTypes(K type, Map<? super K, Integer> map) {
+-      Integer existing = map.get(this);
++      Integer existing = map.get(type);
+       if (existing != null) {
+         // short circuit: if set contains type it already contains its supertypes
+         return existing;
+       }
+       int aboveMe = getRawType(type).isInterface()
+           ? 1 // interfaces should be listed before Object
+           : 0;
+       for (K interfaceType : getInterfaces(type)) {
+         aboveMe = Math.max(aboveMe, collectTypes(interfaceType, map));
+       }
+       K superclass = getSuperclass(type);
+       if (superclass != null) {
+         aboveMe = Math.max(aboveMe, collectTypes(superclass, map));
+       }
+       /*
+        * TODO(benyu): should we include Object for interface?
+        * Also, CharSequence[] and Object[] for String[]?
+        *
+        */
+       map.put(type, aboveMe + 1);
+       return aboveMe + 1;
+     }
+\ No newline at end of file
+",Buggy,"Fix calls to contains(Object) and get(Object) that pass a value of apparently the wrong type.
+Tighten up some generics in other cases to make the type, which was correct after all, look more correct.
+
+BUGS:
+
+AbstractBiMapTester:
+- Fix inv.entrySet().contains(...) check, which was using the forward entry instead of the reverse.
+- Fix getMap().get(v) call to be an inv.get(v) call.
+- Use |reversed| instead of |entry| consistently for clarity.
+
+TypeToken:
+- Call map.get(K) instead of map.get(TypeCollector).
+(Presumably this was just an optimization and not necessary for correctness?)
+
+SIMPLIFICATIONS:
+
+TypeResolver:
+- forLookup always returns a (nullable) TypeVariableKey. Declare that return type instead of plain Object.
+(benyu@: I feel like we may have talked about this, with your expressing a preference for the Object type. But I can find no record of the discussion, so I could be making that up. If you do prefer Object, I won't push for the change.)
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=108994208"
+hbase,10177.json,9fac4877d3072c3589370c9d0446342ee2658ab6,"@@ -1,6 +1,5 @@
+   public void start() {
+     worker = new Thread(null, this, ""SplitLogWorker-"" + serverName);
+     exitWorker = false;
+     worker.start();
+-    return;
+   }
+\ No newline at end of file
+",NotBuggy,"HBASE-5598 Analyse and fix the findbugs reporting by QA and add invalid bugs into findbugs-excludeFilter file
+
+git-svn-id: https://svn.apache.org/repos/asf/hbase/trunk@1425351 13f79535-47bb-0310-9956-ffa450edef68
+"
+lucene-solr,17606.json,481a1f859d0e9c844113c7693424c6aca1fa5245,"@@ -1,54 +1,54 @@
+   public void checkSystemCollection() {
+     if (cloudManager != null) {
+       try {
+         if (cloudManager.isClosed() || Thread.interrupted()) {
+           factory.setPersistent(false);
+           return;
+         }
+         ClusterState clusterState = cloudManager.getClusterStateProvider().getClusterState();
+         DocCollection systemColl = clusterState.getCollectionOrNull(CollectionAdminParams.SYSTEM_COLL);
+         if (systemColl == null) {
+           if (logMissingCollection) {
+-            log.warn(""Missing "" + CollectionAdminParams.SYSTEM_COLL + "", keeping metrics history in memory"");
++            log.info(""No "" + CollectionAdminParams.SYSTEM_COLL + "" collection, keeping metrics history in memory."");
+             logMissingCollection = false;
+           }
+           factory.setPersistent(false);
+           return;
+         } else {
+           boolean ready = false;
+           for (Replica r : systemColl.getReplicas()) {
+             if (r.isActive(clusterState.getLiveNodes())) {
+               ready = true;
+               break;
+             }
+           }
+           if (!ready) {
+-            log.debug(CollectionAdminParams.SYSTEM_COLL + "" not ready yet, keeping metrics history in memory"");
++            log.debug(CollectionAdminParams.SYSTEM_COLL + ""collection not ready yet, keeping metrics history in memory"");
+             factory.setPersistent(false);
+             return;
+           }
+         }
+       } catch (Exception e) {
+         if (logMissingCollection) {
+           log.warn(""Error getting cluster state, keeping metrics history in memory"", e);
+         }
+         logMissingCollection = false;
+         factory.setPersistent(false);
+         return;
+       }
+       logMissingCollection = true;
+       factory.setPersistent(true);
+     } else {
+       try {
+         solrClient.query(CollectionAdminParams.SYSTEM_COLL, new SolrQuery(CommonParams.Q, ""*:*"", CommonParams.ROWS, ""0""));
+         factory.setPersistent(true);
+         logMissingCollection = true;
+       } catch (Exception e) {
+         if (logMissingCollection) {
+-          log.warn(""Error querying .system collection, keeping metrics history in memory"", e);
++          log.info(""No "" + CollectionAdminParams.SYSTEM_COLL + "" collection, keeping metrics history in memory."");
+         }
+         logMissingCollection = false;
+         factory.setPersistent(false);
+       }
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"SOLR-11779: Reduce logging, fix index size conversion bug.
+"
+lucene-solr,38533.json,b33d7176aa3624df2de1708b17919f20d034872f,"@@ -1,15 +1,16 @@
+-  private static void intersectInterval(double heatMin, double heatMax, double heatCellLen, int heatLen,
++  private static void intersectInterval(double heatMin, double heatMax, double heatCellLen, int numCells,
+                                         double cellMin, double cellMax,
+                                         int[] out) {
++    assert heatMin < heatMax && cellMin < cellMax;
+     //precondition: we know there's an intersection
+     if (heatMin >= cellMin) {
+       out[0] = 0;
+     } else {
+       out[0] = (int) Math.round((cellMin - heatMin) / heatCellLen);
+     }
+     if (heatMax <= cellMax) {
+-      out[1] = heatLen - 1;
++      out[1] = numCells - 1;
+     } else {
+       out[1] = (int) Math.round((cellMax - heatMin) / heatCellLen) - 1;
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"LUCENE-7291: Fix spatial HeatmapFacetCounter bug with dateline and large non-point shapes
+"
+sonarqube,3674.json,fd78d281d57d7b1ffa49d27cd03de39b6a961592,"@@ -1,7 +1,7 @@
+   private List<Setting> loadDefaultSettings(Set<String> keys) {
+     return propertyDefinitions.getAll().stream()
+       .filter(definition -> keys.contains(definition.key()))
+-      .filter(defaultProperty -> !isNullOrEmpty(defaultProperty.defaultValue()))
++      .filter(defaultProperty -> !isEmpty(defaultProperty.defaultValue()))
+       .map(Setting::createForDefinition)
+       .collect(Collectors.toList());
+   }
+\ No newline at end of file
+",NotBuggy,"Fix Quality flaws
+
+- missing tests for Protobuf
+- remove incorrect imports of org.elasticsearch.common.Strings
+"
+sonarqube,8268.json,3bfcfa0de67e7f00d7cd0dc74649fef7e5772298,"@@ -1,3 +1,3 @@
+   public void stop() {
+-
++    // do nothing
+   }
+\ No newline at end of file
+",NotBuggy,"Fix some quality flaws
+"
+sonarqube,19956.json,d102a8a9916bac0ab600cd5e90ba5359766f8d6d,"@@ -1,3 +1,3 @@
+   public void stop() {
+-
++    // Nothing to do
+   }
+\ No newline at end of file
+",NotBuggy,"Fix some quality flaws
+"
+jna,4113.json,64466deb5eb01a0d9c3e27ceb2a89d4e6d546908,"@@ -1,147 +1,147 @@
+     private LayoutInfo deriveLayout(boolean force, boolean avoidFFIType) {
+         int calculatedSize = 0;
+         List fields = getFields(force);
+         if (fields == null) {
+             return null;
+         }
+ 
+         LayoutInfo info = new LayoutInfo();
+         info.alignType = this.alignType;
+         info.typeMapper = this.typeMapper;
+ 
+         boolean firstField = true;
+         for (Iterator i=fields.iterator();i.hasNext();firstField=false) {
+             Field field = (Field)i.next();
+             int modifiers = field.getModifiers();
+ 
+             Class type = field.getType();
+             if (type.isArray()) {
+                 info.variable = true;
+             }
+             StructField structField = new StructField();
+             structField.isVolatile = Modifier.isVolatile(modifiers);
+             structField.isReadOnly = Modifier.isFinal(modifiers);
+             if (structField.isReadOnly) {
+                 if (!Platform.RO_FIELDS) {
+                     throw new IllegalArgumentException(""This VM does not support read-only fields (field '""
+                                                        + field.getName() + ""' within "" + getClass() + "")"");
+                 }
+                 // In J2SE VMs, this allows overriding the value of final
+                 // fields
+                 field.setAccessible(true);
+             }
+             structField.field = field;
+             structField.name = field.getName();
+             structField.type = type;
+ 
+             // Check for illegal field types
+             if (Callback.class.isAssignableFrom(type) && !type.isInterface()) {
+                 throw new IllegalArgumentException(""Structure Callback field '""
+                                                    + field.getName()
+                                                    + ""' must be an interface"");
+             }
+             if (type.isArray()
+                 && Structure.class.equals(type.getComponentType())) {
+                 String msg = ""Nested Structure arrays must use a ""
+                     + ""derived Structure type so that the size of ""
+                     + ""the elements can be determined"";
+                 throw new IllegalArgumentException(msg);
+             }
+ 
+             int fieldAlignment = 1;
+             if (!Modifier.isPublic(field.getModifiers())) {
+                 continue;
+             }
+ 
+             Object value = getFieldValue(structField.field);
+             if (value == null && type.isArray()) {
+                 if (force) {
+                     throw new IllegalStateException(""Array fields must be initialized"");
+                 }
+                 // can't calculate size yet, defer until later
+                 return null;
+             }
+             Class nativeType = type;
+             if (NativeMapped.class.isAssignableFrom(type)) {
+                 NativeMappedConverter tc = NativeMappedConverter.getInstance(type);
+                 nativeType = tc.nativeType();
+                 structField.writeConverter = tc;
+                 structField.readConverter = tc;
+                 structField.context = new StructureReadContext(this, field);
+             }
+             else if (typeMapper != null) {
+                 ToNativeConverter writeConverter = typeMapper.getToNativeConverter(type);
+                 FromNativeConverter readConverter = typeMapper.getFromNativeConverter(type);
+                 if (writeConverter != null && readConverter != null) {
+                     value = writeConverter.toNative(value,
+                                                     new StructureWriteContext(this, structField.field));
+                     nativeType = value != null ? value.getClass() : Pointer.class;
+                     structField.writeConverter = writeConverter;
+                     structField.readConverter = readConverter;
+                     structField.context = new StructureReadContext(this, field);
+                 }
+                 else if (writeConverter != null || readConverter != null) {
+                     String msg = ""Structures require bidirectional type conversion for "" + type;
+                     throw new IllegalArgumentException(msg);
+                 }
+             }
+ 
+             if (value == null) {
+                 value = initializeField(structField.field, type);
+             }
+ 
+             try {
+                 structField.size = getNativeSize(nativeType, value);
+                 fieldAlignment = getNativeAlignment(nativeType, value, firstField);
+             }
+             catch(IllegalArgumentException e) {
+                 // Might simply not yet have a type mapper set yet
+                 if (!force && typeMapper == null) {
+                     return null;
+                 }
+-                String msg = ""Invalid Structure field in "" + getClass() + "", field name '"" + structField.name + ""' ("" + structField.type + "")"";
++                String msg = ""Invalid Structure field in "" + getClass() + "", field name '"" + structField.name + ""' ("" + structField.type + ""): "" + e.getMessage();
+                 throw new IllegalArgumentException(msg, e);
+             }
+ 
+             // Align fields as appropriate
+             if (fieldAlignment == 0) {
+                 throw new Error(""Field alignment is zero for field '"" + structField.name + ""' within "" + getClass());
+             }
+             info.alignment = Math.max(info.alignment, fieldAlignment);
+             if ((calculatedSize % fieldAlignment) != 0) {
+                 calculatedSize += fieldAlignment - (calculatedSize % fieldAlignment);
+             }
+             if (this instanceof Union) {
+                 structField.offset = 0;
+                 calculatedSize = Math.max(calculatedSize, structField.size);
+             }
+             else {
+                 structField.offset = calculatedSize;
+                 calculatedSize += structField.size;
+             }
+ 
+             // Save the field in our list
+             info.fields.put(structField.name, structField);
+ 
+             if (info.typeInfoField == null
+                 || info.typeInfoField.size < structField.size
+                 || (info.typeInfoField.size == structField.size
+                     && Structure.class.isAssignableFrom(structField.type))) {
+                 info.typeInfoField = structField;
+             }
+         }
+ 
+         if (calculatedSize > 0) {
+             int size = addPadding(calculatedSize, info.alignment);
+             // Update native FFI type information, if needed
+             if (this instanceof ByValue && !avoidFFIType) {
+                 getTypeInfo();
+             }
+             info.size = size;
+             return info;
+         }
+ 
+         throw new IllegalArgumentException(""Structure "" + getClass()
+                                            + "" has unknown or zero size (ensure ""
+                                            + ""all fields are public)"");
+     }
+\ No newline at end of file
+",NotBuggy,"Ensure exception message includes all faulty field information (fixes broken test)
+"
+guava,1857.json,a0f748e78516c8c80c945f6a4c4fae752d11bff5,"@@ -1,9 +1,7 @@
+   private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
+     stream.defaultReadObject();
+     keyType = (Class<K>) stream.readObject();
+     valueType = (Class<V>) stream.readObject();
+-    setDelegates(
+-        WellBehavedMap.wrap(new EnumMap<K, V>(keyType)),
+-        WellBehavedMap.wrap(new EnumMap<V, K>(valueType)));
++    setDelegates(new EnumMap<K, V>(keyType), new EnumMap<V, K>(valueType));
+     Serialization.populateMap(this, stream);
+   }
+\ No newline at end of file
+",NotBuggy,"Delete WellBehavedMap.
+
+The bug it worked around was fixed in Java 7:
+https://bugs.java.com/bugdatabase/view_bug.do?bug_id=6312706
+
+And I don't believe it was ever present under Android:
+https://android.googlesource.com/platform/libcore/+/fdb2704414a9ed92394ada0d1395e4db86889465/luni/src/main/java/java/util/EnumMap.java#146
+
+I haven't looked for the absolute first version ever of GWT, but the still very old GWT file doesn't have the bug, either.
+
+Deleting this class will simplify some work I'm doing around our EnumMap usage for j2cl.
+
+RELNOTES=n/a
+
+-------------
+Created by MOE: https://github.com/google/moe
+MOE_MIGRATED_REVID=233418344"
+lucene-solr,50428.json,ceb4f768bf5b71a91872f9ecdc5ebed4d0262903,"@@ -1,22 +1,23 @@
+   private GeoPoint[] findAdjoiningPoints(final Plane plane, final GeoPoint pointOnPlane, final Plane envelopePlane) {
+     // Compute a normalized perpendicular vector
+     final Vector perpendicular = new Vector(plane, pointOnPlane);
+     double distanceFactor = 0.0;
+     for (int i = 0; i < MAX_ITERATIONS; i++) {
+       distanceFactor += DELTA_DISTANCE;
+       // Compute two new points along this vector from the original
+       final GeoPoint pointA = planetModel.createSurfacePoint(pointOnPlane.x + perpendicular.x * distanceFactor,
+         pointOnPlane.y + perpendicular.y * distanceFactor,
+         pointOnPlane.z + perpendicular.z * distanceFactor);
+       final GeoPoint pointB = planetModel.createSurfacePoint(pointOnPlane.x - perpendicular.x * distanceFactor,
+         pointOnPlane.y - perpendicular.y * distanceFactor,
+         pointOnPlane.z - perpendicular.z * distanceFactor);
+       if (Math.abs(envelopePlane.evaluate(pointA)) > OFF_PLANE_AMOUNT && Math.abs(envelopePlane.evaluate(pointB)) > OFF_PLANE_AMOUNT) {
+         //System.out.println(""Distance: ""+computeSquaredDistance(rval[0], pointOnPlane)+"" and ""+computeSquaredDistance(rval[1], pointOnPlane));
+         return new GeoPoint[]{pointA, pointB};
+       }
+       // Loop back around and use a bigger delta
+     }
+     // Had to abort, so return null.
++    //System.out.println(""     Adjoining points not found.  Are planes parallel?  edge = ""+plane+""; envelope = ""+envelopePlane+""; perpendicular = ""+perpendicular);
+     return null;
+   }
+\ No newline at end of file
+",NotBuggy,"LUCENE-8337: Fix problems with how travel planes too close to edge of world are disallowed, and increase the size of the disallowed window by an order of magnitude.
+"
+hbase,5737.json,c24cf2d55ecd479c89b0613b6ebbdaba4eb793ad,"@@ -1,7 +1,10 @@
+   private void addRegion(final LinkedList<RegionInfo> regions, RegionInfo hri) {
+     // If meta, move it last otherwise other unassigns fail because meta is not
+     // online for them to update state in. This is dodgy. Needs to be made more
+     // robust. See TODO below.
+-    if (hri.isMetaRegion()) regions.addLast(hri);
+-    else regions.addFirst(hri);
++    if (hri.isMetaRegion()) {
++      regions.addLast(hri);
++    } else {
++      regions.addFirst(hri);
++    }
+   }
+\ No newline at end of file
+",NotBuggy,"HBASE-19601 Fixed Checkstyle errors in hbase-rsgroup and enabled Checkstyle to fail on violations
+"
+hbase,10426.json,f1ad5cb93837e8d07d9d08da7c1a48caf74bbe9f,"@@ -1,30 +1,34 @@
+   protected void configureForRegion(HRegion region) {
+     super.configureForRegion(region);
+     if (region != null) {
+       prefixLength = 0;
+ 
+       // read the prefix length from the table descriptor
+       String prefixLengthString = region.getTableDesc().getValue(
+           PREFIX_LENGTH_KEY);
+       if (prefixLengthString == null) {
+         //read the deprecated value
+         prefixLengthString = region.getTableDesc().getValue(PREFIX_LENGTH_KEY_DEPRECATED);
+         if (prefixLengthString == null) {
+           LOG.error(PREFIX_LENGTH_KEY + "" not specified for table ""
+               + region.getTableDesc().getTableName()
+               + "". Using default RegionSplitPolicy"");
+           return;
+         }
+       }
+       try {
+         prefixLength = Integer.parseInt(prefixLengthString);
+       } catch (NumberFormatException nfe) {
+-        // ignore
++        /* Differentiate NumberFormatException from an invalid value range reported below. */
++        LOG.error(""Number format exception when parsing "" + PREFIX_LENGTH_KEY + "" for table ""
++            + region.getTableDesc().getTableName() + "":""
++            + prefixLengthString + "". "" + nfe);
++        return;
+       }
+       if (prefixLength <= 0) {
+         LOG.error(""Invalid value for "" + PREFIX_LENGTH_KEY + "" for table ""
+             + region.getTableDesc().getTableName() + "":""
+             + prefixLengthString + "". Using default RegionSplitPolicy"");
+       }
+     }
+   }
+\ No newline at end of file
+",NotBuggy,"HBASE-10452 Fix potential bugs in exception handlers (Ding Yuan)
+
+
+
+git-svn-id: https://svn.apache.org/repos/asf/hbase/trunk@1567979 13f79535-47bb-0310-9956-ffa450edef68
+"
+pmd,7974.json,78583ee897aa40fd474c85d59cccee016dfadfe0,"@@ -1,32 +1,32 @@
+     public boolean isOnLeftHandSide() {
+         SimpleNode primaryExpression;
+         if (location.jjtGetParent() instanceof ASTPrimaryExpression) {
+             primaryExpression = (SimpleNode) location.jjtGetParent().jjtGetParent();
+         } else if (location.jjtGetParent().jjtGetParent() instanceof ASTPrimaryExpression) {
+             primaryExpression = (SimpleNode) location.jjtGetParent().jjtGetParent().jjtGetParent();
+         } else {
+             throw new RuntimeException(""Found a NameOccurrence that didn't have an ASTPrimary Expression as parent or grandparent.  Parent = "" + location.jjtGetParent() + "" and grandparent = "" + location.jjtGetParent().jjtGetParent());
+         }
+ 
+-        if (postFixWithExceptions(primaryExpression))  {
++        if (isStandAlonePostfix(primaryExpression))  {
+             return true;
+         }
+ 
+         if (primaryExpression.jjtGetNumChildren() <= 1) {
+             return false;
+         }
+ 
+         if (!(primaryExpression.jjtGetChild(1) instanceof ASTAssignmentOperator)) {
+             return false;
+         }
+ 
+         if (isPartOfQualifiedName() /* or is an array type */) {
+             return false;
+         }
+ 
+         if (isCompoundAssignment(primaryExpression)) {
+             return false;
+         }
+ 
+         return true;
+     }
+\ No newline at end of file
+",NotBuggy,"Fixed a predecrement problem
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@3005 51baf565-9d33-0410-a72c-fc3788e3496d"
+pmd,8892.json,78583ee897aa40fd474c85d59cccee016dfadfe0,"@@ -1,6 +1,5 @@
+     private Set findAllConstructors(ASTUnmodifiedClassDeclaration node) {
+-        List results = node.findChildrenOfType(ASTConstructorDeclaration.class);
+-        HashSet set = new HashSet();
+-        set.addAll(results);
++        Set set = new HashSet();
++        set.addAll(node.findChildrenOfType(ASTConstructorDeclaration.class));
+         return set;
+     }
+\ No newline at end of file
+",NotBuggy,"Fixed a predecrement problem
+
+
+git-svn-id: https://pmd.svn.sourceforge.net/svnroot/pmd/trunk@3005 51baf565-9d33-0410-a72c-fc3788e3496d"

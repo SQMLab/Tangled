@@ -1,3 +1,4 @@
+import logging
 from google import genai
 from openai import OpenAI
 import configparser
@@ -9,7 +10,6 @@ import os
 import io
 import re
 import tiktoken
-
 
 class BaseUntangler:
     def __init__(self, model_name="", include_msg=True, shot_count=0, enable_cot=False):
@@ -125,7 +125,7 @@ class GeminiUntangler(BaseUntangler):
                 answer = item["Answer"].strip()
 
                 if self.include_msg:
-                    input = f"\nCommit Messaage: {commit_message}\nGit Diff:\n{git_diff}"
+                    input = f"\nCommit Message: {commit_message}\nGit Diff:\n{git_diff}"
                 else:
                     input = f"\nGit Diff:\n{git_diff}"
 
@@ -140,7 +140,7 @@ class GeminiUntangler(BaseUntangler):
 
     def prepare_prompt(self, commitMessage, diff):
         if self.include_msg:
-            question = f"\nCommit Messaage: {commitMessage}\nGit Diff:\n{diff}\nAnswer:"
+            question = f"\nCommit Message: {commitMessage}\nGit Diff:\n{diff}\nAnswer:"
         else:
             question = f"Git Diff:\n{diff}\nAnswer:"
 
@@ -235,7 +235,7 @@ class OpenAIUntangler(BaseUntangler):
                     few_shots.append(
                         {
                             "role": "user",
-                            "content": f"Commit Messaage: {commit_message}\nGit Diff:\n{git_diff}",
+                            "content": f"Commit Message: {commit_message}\nGit Diff:\n{git_diff}",
                         }
                     )
                 else:
@@ -267,7 +267,7 @@ class OpenAIUntangler(BaseUntangler):
             messages.append(
                 {
                     "role": "user",
-                    "content": f"Commit Messaage: {commitMessage}\nGit Diff:\n{diff}",
+                    "content": f"Commit Message: {commitMessage}\nGit Diff:\n{diff}",
                 }
             )
         else:
@@ -406,34 +406,49 @@ class OpenAIUntangler(BaseUntangler):
         return batch, df
 
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import torch, gc
+from transformers import pipeline
 
-class FreeUntangler(BaseUntangler):
-    def __init__(self, model_name="microsoft/Phi-3-mini-4k-instruct", include_msg=True, shot_count=0, enable_cot=False):
+class OpenUntangler(BaseUntangler):
+    def __init__(self, model_name="openai/gpt-oss-120b", include_msg=True, shot_count=0, enable_cot=False, logger = None):
         super().__init__(model_name, include_msg, shot_count, enable_cot)
+        self.logger = logger
         self.__setup()
 
-    def __setup(self):
-        config = configparser.ConfigParser()
-        config.read(".config")
-        hf_token=config["API_KEYS"]["HF_TOKEN"]
+    def log(self, msg, level = logging.INFO):
+        if self.logger:
+            self.logger.log(level, msg)
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            #device_map="cuda",
-            torch_dtype="auto",
-            trust_remote_code=True,
-            token=hf_token
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, token=hf_token)
-        print(f"Max Token: {self.tokenizer.model_max_length}")
+    def __setup(self):
+        self.log("Number of GPUs available: " + str(torch.cuda.device_count()))
+        max_mem = {i: "78GiB" for i in range(torch.cuda.device_count())}
+        max_mem[0] = "65GiB"
+
         self.pipe = pipeline(
             "text-generation",
-            model=self.model,
-            tokenizer=self.tokenizer,
-            eos_token_id=self.tokenizer.eos_token_id,
+            model=self.model_name,
+            dtype=torch.float16,
+            device_map="balanced_low_0", 
+            truncation=True,
+            model_kwargs = {
+                "max_memory":max_mem,
+                "offload_folder": "./offload"
+            },
         )
+
+        try:
+            self.pipe.model.max_memory = max_mem
+            self.pipe.model.config.offload_folder = "./offload"
+        except:
+            self.log("Could not set max_memory or offload_folder")
+
+        self.pipe.tokenizer.padding_side = "left"
+        if self.pipe.tokenizer.pad_token is None:
+            self.pipe.tokenizer.pad_token = self.pipe.tokenizer.eos_token
+
+        self.pipe.model.eval()
+        torch.set_grad_enabled(False)
+
         self.__prepare_few_shot_data()
 
     def __prepare_few_shot_data(self):
@@ -455,7 +470,7 @@ class FreeUntangler(BaseUntangler):
                     few_shots.append(
                         {
                             "role": "user",
-                            "content": f"Commit Messaage: {commit_message}\nGit Diff:\n{git_diff}",
+                            "content": f"Commit Message: {commit_message}\nGit Diff:\n{git_diff}",
                         }
                     )
                 else:
@@ -487,7 +502,7 @@ class FreeUntangler(BaseUntangler):
             messages.append(
                 {
                     "role": "user",
-                    "content": f"Commit Messaage: {commitMessage}\nGit Diff:\n{diff}",
+                    "content": f"Commit Message: {commitMessage}\nGit Diff:\n{diff}",
                 }
             )
         else:
@@ -498,49 +513,69 @@ class FreeUntangler(BaseUntangler):
                 }
             )
         
-        messages[0]["content"] = self.initial_prompt + "\n" + messages[0]["content"]
+        if "gemma" in self.model_name.lower():
+            messages[0]["content"] = self.initial_prompt + "\n" + messages[0]["content"]
+        else:
+            messages.insert(0, {"role": "system", "content": self.initial_prompt})
         self.prompt = messages
 
     def detect(self):
         if self.prompt == "":
             raise ValueError("Provide a new diff using prepare_prompt()")
-        output = self.pipe(self.prompt)
+        start = time.time()
+        self.log("Detecting...")
+        output = self.pipe(self.prompt, max_new_tokens=100000, do_sample=False)
         prediction = output[0]["generated_text"][-1]["content"]
 
+        self.log(f"Output: {prediction}")
+        duration = time.time() - start
+        self.log(f"Detection in {duration}s")
+
         if self.enable_cot:
+            self.log("Extracting COT result.")
             return self.extract_cot_based_result(prediction)
 
         return prediction.strip()
 
-    def batch_detect(self, df):
+    def batch_detect(self, df, callback=None):
         df = df.copy()
 
-        explanations = []
-        answers = []
+        if "Detection" not in df.columns:
+            df["Detection"] = None
+        if "Explanation" not in df.columns and self.enable_cot:
+            df["Explanation"] = None
 
-        for index, row in tqdm(df.iterrows()):
-            error = True
-            self.prepare_prompt(row["CommitMessage"], row["Diff"])
+        with torch.inference_mode():
+            for index, row in tqdm(df.iterrows()):
+                # if index == 180 and "gpt-oss-120b" in self.model_name:
+                #     self.log("Skipping index 180 for gpt-oss-120b due to OOM issues", logging.WARNING)
+                #     continue
+                if "Detection" not in df.columns or row["Detection"] is None or pd.isna(row["Detection"]) or row["Detection"] == "" or len(row["Detection"].strip()) < 5:
+                    self.log(f"Detecting: {index}")
+                    start = time.time()
 
-            while error:
-                try:
-                    pred = self.detect()
-                    error = False
-                except Exception as e:
-                    error = True
-                    print(f"Error - {e}.\nRetrying...")
-                    time.sleep(1)
+                    self.prepare_prompt(row["CommitMessage"], row["Diff"])
+                    result = self.pipe(self.prompt, truncation=True, max_new_tokens=10000)
+                    pred = result[0]["generated_text"][-1]["content"]
+                    
+                    duration = time.time() - start
+                    self.log(f"Detection in {duration}s")
 
-            if self.enable_cot:
-                e, a = self.extract_cot_based_result(pred)
-                explanations.append(e)
-                answers.append(a)
-            else:
-                explanations.append("")
-                answers.append(pred)
+                    if self.enable_cot:
+                        e, a = self.extract_cot_based_result(pred)
+                        df.loc[index, "Explanation"] = e
+                        df.loc[index, "Detection"] = a
+                    else:
+                        df.loc[index, "Detection"] = pred
 
-        df["Detection"] = answers
-        if self.enable_cot:
-            df["Explanation"] = explanations
+                    del result
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                    torch.cuda.reset_peak_memory_stats()
 
+                    if callback is not None:
+                        callback(df)
+                else:
+                    self.log(f"Skipping: {index}")
+                    continue
         return df

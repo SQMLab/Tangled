@@ -9,3 +9,4 @@ request.jsonl
 /data/DatasetWithNoise
 /data/DatasetWithoutNoise
 /data/DatasetWithoutTangledNoise
+/logs
