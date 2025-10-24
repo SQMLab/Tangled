@@ -49,10 +49,12 @@ Ensure the .config file is correctly populated with API keys.
 
 ### RQ1
 - Run [RQ1.ipynb](./RQ1.ipynb) to reproduce the results of RQ1.
+- Open-source model realated experiments are in [OpenSourceModels.ipynb](./OpenSourceModels.ipynb)
 - Results are stored at [./Results/RQ1/](./Results/RQ1/)
 
 ### RQ2
 - Run [RQ2.ipynb](./RQ2.ipynb) to reproduce the results of RQ2.
+- Open-source model realated experiments are in [OpenSourceModels.ipynb](./OpenSourceModels.ipynb)
 - Results are stored at [./Results/RQ2/](./Results/RQ2/)
 
 ### RQ3
